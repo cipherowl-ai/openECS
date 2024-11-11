@@ -1,4 +1,4 @@
-module github.com/cipherowl-ai/addressdb.git
+module github.com/cipherowl-ai/addressdb
 
 go 1.21
 
