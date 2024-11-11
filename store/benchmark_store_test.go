@@ -1,8 +1,8 @@
 package store
 
 import (
-	"addressdb/address"
 	"github.com/bits-and-blooms/bloom/v3"
+	"github.com/cipherowl-ai/addressdb/address"
 	"github.com/ethereum/go-ethereum/crypto"
 	"log"
 	"math/rand"

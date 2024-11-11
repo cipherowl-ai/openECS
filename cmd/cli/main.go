@@ -1,8 +1,8 @@
 package main
 
 import (
-	"addressdb/cmd/cli/commands"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/cmd/cli/commands"
 	"os"
 
 	"github.com/spf13/cobra"

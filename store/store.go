@@ -1,11 +1,11 @@
 package store
 
 import (
-	"addressdb/address"
-	"addressdb/securedata"
 	"bufio"
 	"fmt"
 	"github.com/bits-and-blooms/bloom/v3"
+	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/securedata"
 	"os"
 	"sync"
 )

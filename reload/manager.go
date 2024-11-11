@@ -1,9 +1,9 @@
 package reload
 
 import (
-	"addressdb/store"
 	"context"
 	"errors"
+	"github.com/cipherowl-ai/addressdb/store"
 	"golang.org/x/sync/errgroup"
 	"log"
 )
