@@ -1,4 +1,4 @@
-# ZkAddressStore
+# addressdb
 
 ## Status Of The Project
 
@@ -6,7 +6,7 @@ The project is currently in the beta phrase, it will contain breaking changes in
 
 ## Overview
 
-ZkAddressStore demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
+addressdb demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
 
 ## Key Features
 
@@ -26,8 +26,8 @@ The `.gob` file can be easily shared across data pipelines. Adding key-pair encr
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/ZkAddressStore.git
-cd ZkAddressStore
+git clone https://github.com/your-username/addressdb.git
+cd addressdb
 go mod tidy
 ```
 
