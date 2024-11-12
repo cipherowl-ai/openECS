@@ -1,6 +1,7 @@
 package securedata
 
 import (
+	"bufio"
 	"bytes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,6 +134,36 @@ func TestPGPSecureHandler_Reader(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, "test data", string(decryptedData))
 			}
+		})
+	}
+}
+
+func TestIsRawEncrypted(t *testing.T) {
+	keys := GenerateTestKeys(t)
+	privKey, pubKey := keys[0], keys[1]
+	handler, err := NewPGPSecureHandler(WithPrivateKey(privKey), WithPublicKey(pubKey))
+	require.NoError(t, err)
+	require.NotNil(t, handler)
+
+	var buf bytes.Buffer
+	writer := createWriter(t, handler, &buf)
+	writeData(t, writer, "test data")
+
+	tests := []struct {
+		name string
+		data []byte
+		want bool
+	}{
+		{"empty data", []byte{}, false},
+		{"encrypted data", buf.Bytes(), true},
+		{"unencrypted data", []byte("test data"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := bufio.NewReader(bytes.NewReader(tt.data))
+			ok, err := IsRawEncrypted(reader)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, ok)
 		})
 	}
 }

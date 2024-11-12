@@ -3,8 +3,6 @@ package commands
 import (
 	"bufio"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/store"
 	"io"
 	"os"
 
@@ -21,13 +19,15 @@ var filename string
 
 func init() {
 	CheckCmd.Flags().StringVarP(&filename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
+	CheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
+	CheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
+	CheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
 }
 
 func runCheck(_ *cobra.Command, _ []string) {
-	addressHandler := &address.EVMAddressHandler{}
-	filter, err := store.NewBloomFilterStoreFromFile(filename, addressHandler)
+	filter, err := loadBloomFilter(filename)
 	if err != nil {
-		fmt.Println("Error opening file:", err)
+		fmt.Println(err)
 		os.Exit(-1)
 	}
 

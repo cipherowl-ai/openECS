@@ -3,8 +3,6 @@ package commands
 import (
 	"bufio"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/store"
 	"io"
 	"os"
 	"time"
@@ -18,20 +16,19 @@ var BatchCheckCmd = &cobra.Command{
 	Run:   runBatchCheck,
 }
 
-var batchFilename string
-
 func init() {
-	BatchCheckCmd.Flags().StringVarP(&batchFilename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
+	BatchCheckCmd.Flags().StringVarP(&filename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
+	BatchCheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
+	BatchCheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
+	BatchCheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
 }
 
 func runBatchCheck(_ *cobra.Command, _ []string) {
 	start := time.Now()
 
-	// Open the serialized Bloom filter file
-	addressHandler := &address.EVMAddressHandler{}
-	filter, err := store.NewBloomFilterStoreFromFile(batchFilename, addressHandler)
+	filter, err := loadBloomFilter(filename)
 	if err != nil {
-		fmt.Println("Error opening file:", err)
+		fmt.Println(err)
 		os.Exit(-1)
 	}
 

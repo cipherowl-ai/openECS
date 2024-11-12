@@ -1,6 +1,7 @@
 package securedata
 
 import (
+	"bufio"
 	"errors"
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
 	"github.com/ProtonMail/gopenpgp/v3/profile"
@@ -129,6 +130,7 @@ func (r *VerifiedReader) Read(b []byte) (int, error) {
 	return n, err
 }
 
+// VerifySignature verifies the signature of the data read so far.
 func (r *VerifiedReader) VerifySignature() error {
 	if result, err := r.reader.ReadAllAndVerifySignature(); err != nil {
 		return err
@@ -137,4 +139,41 @@ func (r *VerifiedReader) VerifySignature() error {
 	}
 
 	return nil
+}
+
+// IsRawEncrypted checks if the data is encrypted.
+func IsRawEncrypted(reader *bufio.Reader) (bool, error) {
+	// Define packet tags for asymmetric encryption detection
+	const (
+		publicKeyEncryptedSessionKeyPacket = 1 // Tag 1
+		symmetricallyEncryptedDataPacket   = 9 // Tag 9
+		compressedDataPacket               = 8 // Tag 8 (often used in encrypted messages)
+		onePassSignaturePacket             = 4 // Tag 4 (used in signed and encrypted messages)
+		signaturePacket                    = 2 // Tag 2 (digital signatures)
+	)
+
+	// Peek at the first 10 bytes to check for packet types
+	// Attempt to peek at the first 20 bytes
+	headerBytes, err := reader.Peek(20)
+	if err != nil {
+		if err != io.EOF {
+			return false, err // An unexpected error occurred
+		}
+		// Handle cases where the file is smaller than 20 bytes (EOF reached)
+		headerBytes = headerBytes[:len(headerBytes)] // Use available bytes
+	}
+
+	// Iterate over the peeked bytes to find packet tags related to encryption
+	for _, b := range headerBytes {
+		packetTag := b & 0x3F // Extract packet tag from each byte
+		if packetTag == publicKeyEncryptedSessionKeyPacket ||
+			packetTag == symmetricallyEncryptedDataPacket ||
+			packetTag == compressedDataPacket ||
+			packetTag == onePassSignaturePacket ||
+			packetTag == signaturePacket {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

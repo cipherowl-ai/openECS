@@ -131,6 +131,13 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 		}
 	} else {
 		r := bufio.NewReader(f)
+
+		if ok, err := securedata.IsRawEncrypted(r); err != nil {
+			return fmt.Errorf("failed to check if file is encrypted: %w", err)
+		} else if ok {
+			return fmt.Errorf("file is encrypted but no SecureDataHandler provided")
+		}
+
 		if _, err := filter.ReadFrom(r); err != nil {
 			return fmt.Errorf("failed to read Bloom filter: %w", err)
 		}
