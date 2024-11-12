@@ -17,10 +17,13 @@ var EncodeCmd = &cobra.Command{
 }
 
 var (
-	nFlag      uint
-	pFlag      float64
-	inputFile  string
-	outputFile string
+	nFlag                uint
+	pFlag                float64
+	inputFile            string
+	outputFile           string
+	privateKeyFile       string
+	publicKeyFile        string
+	privateKeyPassphrase string
 )
 
 func init() {
@@ -28,11 +31,23 @@ func init() {
 	EncodeCmd.Flags().Float64VarP(&pFlag, "probability", "p", 0.00001, "false positive probability")
 	EncodeCmd.Flags().StringVarP(&inputFile, "input", "i", "addresses.txt", "input file path")
 	EncodeCmd.Flags().StringVarP(&outputFile, "output", "o", "bloomfilter.gob", "output file path")
+	EncodeCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the sender private key file (optional)")
+	EncodeCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the recipient public key file (optional)")
+	EncodeCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the sender private key (optional)")
 }
 
 func runEncode(_ *cobra.Command, _ []string) {
 	addressHandler := &address.EVMAddressHandler{}
-	filter, err := store.NewBloomFilterStore(addressHandler, store.WithEstimates(nFlag, pFlag))
+
+	options, err := configurePGPHandler()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(-1)
+	}
+
+	options = append(options, store.WithEstimates(nFlag, pFlag))
+
+	filter, err := store.NewBloomFilterStore(addressHandler, options...)
 	if err != nil {
 		fmt.Println("Error creating Bloom filter:", err)
 		os.Exit(-1)
@@ -58,5 +73,5 @@ func runEncode(_ *cobra.Command, _ []string) {
 		fmt.Println("Error saving Bloom filter:", err)
 		os.Exit(-1)
 	}
-	fmt.Println("Bloom filter has been serialized successfully.")
+	fmt.Printf("Bloom filter has been saved to %s successfully.\n", outputFile)
 }

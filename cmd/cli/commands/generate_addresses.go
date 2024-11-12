@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	count int
+	count       int
+	addressFile string
 )
 
 var AddressGenCmd = &cobra.Command{
@@ -21,12 +22,12 @@ var AddressGenCmd = &cobra.Command{
 
 func init() {
 	AddressGenCmd.Flags().IntVarP(&count, "n", "n", 1000000, "number of addresses to generate")
-	AddressGenCmd.Flags().StringVarP(&outputFile, "output", "o", "addresses.txt", "output file for the addresses")
+	AddressGenCmd.Flags().StringVarP(&addressFile, "output", "o", "addresses.txt", "output file for the addresses")
 }
 
 func runAddressGenerator(_ *cobra.Command, _ []string) {
 	// Open the output file
-	file, err := os.Create(outputFile)
+	file, err := os.Create(addressFile)
 	if err != nil {
 		log.Fatalf("Failed to open output file: %v", err)
 	}
