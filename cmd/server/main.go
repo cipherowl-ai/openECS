@@ -6,12 +6,12 @@ Example server for the Bloom filter, should be good enough as OOB solution
 
 */
 import (
-	"addressdb/address"
-	"addressdb/reload"
-	"addressdb/store"
 	"context"
 	"encoding/json"
 	"flag"
+	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/reload"
+	"github.com/cipherowl-ai/addressdb/store"
 	"log"
 	"net/http"
 	"os"
@@ -82,9 +82,9 @@ func main() {
 	}
 
 	go func() {
-		logger.Printf("Starting server on port %s", port)
+		logger.Printf("Starting server on port %v", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Could not listen on %s: %v\n", port, err)
+			logger.Fatalf("Could not listen on %v: %v\n", port, err)
 		}
 	}()
 

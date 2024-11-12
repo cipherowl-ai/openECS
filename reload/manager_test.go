@@ -1,13 +1,13 @@
 package reload
 
 import (
-	"addressdb/address"
 	"context"
+	"github.com/cipherowl-ai/addressdb/address"
 	"os"
 	"testing"
 	"time"
 
-	"addressdb/store"
+	"github.com/cipherowl-ai/addressdb/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -28,7 +28,7 @@ func (m *MockNotifier) Close() error {
 
 func setupTest(t *testing.T) (*store.BloomFilterStore, *MockNotifier, string) {
 	addressHandler := &address.EVMAddressHandler{}
-	generator, _ := store.NewBloomFilterStore(1000, 0.001, addressHandler)
+	generator, _ := store.NewBloomFilterStore(addressHandler, store.WithEstimates(1000, 0.001))
 	filePath := os.TempDir() + "/testfile.gob"
 	generator.SaveToFile(filePath)
 	return generator, new(MockNotifier), filePath
@@ -41,6 +41,7 @@ func TestReloadManager_Start(t *testing.T) {
 	address1 := "0x1234567890abcdef1234567890abcdef12345678"
 	address2 := "0xabcdef1234567890abcdef1234567890abcdef12"
 	generator.AddAddress(address1)
+	generator.SaveToFile(filePath)
 
 	store, _ := store.NewBloomFilterStoreFromFile(filePath, &address.EVMAddressHandler{})
 	manager := NewReloadManager(store, notifier)

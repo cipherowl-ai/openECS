@@ -1,10 +1,10 @@
 package commands
 
 import (
-	"addressdb/address"
-	"addressdb/store"
 	"bufio"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/store"
 	"os"
 
 	"github.com/spf13/cobra"
