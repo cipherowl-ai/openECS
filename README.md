@@ -2,7 +2,7 @@
 
 ## Status Of The Project
 
-The project is currently in the beta phrase, it will contain breaking changes in the future.
+Ready to be used in prod
 
 ## Overview
 
