@@ -1,6 +1,6 @@
 package address
 
-import "github.com/btcsuite/btcutil"
+import "github.com/btcsuite/btcd/btcutil"
 
 // BitcoinAddressHandler handles Bitcoin addresses.
 type BitcoinAddressHandler struct{}
