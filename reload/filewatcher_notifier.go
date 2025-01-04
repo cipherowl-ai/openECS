@@ -49,7 +49,7 @@ func (fw *FileWatcherNotifier) WatchForChange(ctx context.Context, onReload func
 			if !ok {
 				return nil // Channel closed, stop the watcher
 			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
+			if event.Op&fsnotify.Write == fsnotify.Write || event.Op&fsnotify.Create == fsnotify.Create {
 				log.Printf("File change detected: %s", fw.filePath)
 				debounceTimer.Reset(fw.reloadDelay)
 			}
