@@ -2,7 +2,6 @@ package address
 
 import (
 	"encoding/hex"
-	"strings"
 )
 
 // EVMAddressHandler handles Ethereum (EVM) addresses.
@@ -21,7 +20,7 @@ func (h *EVMAddressHandler) Validate(address string) error {
 // ToBytes converts an EVM address to bytes.
 func (h *EVMAddressHandler) ToBytes(address string) ([]byte, error) {
 	// decode the hex string would have the same effect as lowercasing the address and checking the hex string length
-	if strings.HasPrefix(address, "0x") {
+	if has0xPrefix(address) {
 		return hex.DecodeString(address[2:])
 	}
 
