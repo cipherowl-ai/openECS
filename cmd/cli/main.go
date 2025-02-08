@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/cmd/cli/commands"
 	"os"
+
+	"github.com/cipherowl-ai/addressdb/cmd/cli/commands"
 
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,7 @@ func main() {
 	rootCmd.AddCommand(commands.CheckCmd)
 	rootCmd.AddCommand(commands.BatchCheckCmd)
 	rootCmd.AddCommand(commands.AddressGenCmd)
+	rootCmd.AddCommand(commands.AddCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
