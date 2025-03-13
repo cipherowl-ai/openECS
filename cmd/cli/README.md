@@ -46,3 +46,13 @@ pa-cli generate-addresses --output ./addresses.txt -n 1000000
 ```
 
 Where btc_tocheck.txt is a file with one address per line
+
+### Add addresses to a bloomfilter
+
+```bash
+pa-cli add --file ./bloomfilter.gob --address 0x1234567890123456789012345678901234567890 --output ./bloomfilter.gob
+```
+
+- `-f`: Path to the bloomfilter file
+- `--address`: Address to add
+- `--output`: Path to the output bloomfilter file
