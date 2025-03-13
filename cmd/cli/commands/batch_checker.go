@@ -21,11 +21,19 @@ func init() {
 	BatchCheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
 	BatchCheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
 	BatchCheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
+	BatchCheckCmd.Flags().StringVar(&env, "env", "prod", "Environment (optional)")
+	BatchCheckCmd.Flags().StringVar(&clientID, "client-id", "", "OAuth client ID (required)")
+	BatchCheckCmd.Flags().StringVar(&clientSecret, "client-secret", "", "OAuth client secret (required)")
+	BatchCheckCmd.MarkFlagRequired("client-id")
+	BatchCheckCmd.MarkFlagRequired("client-secret")
 }
 
 func runBatchCheck(_ *cobra.Command, _ []string) {
 	start := time.Now()
-
+	if err := checkAuth(clientID, clientSecret, env); err != nil {
+		fmt.Printf("Authentication failed: %v\n", err)
+		os.Exit(-1)
+	}
 	filter, err := loadBloomFilter(filename)
 	if err != nil {
 		fmt.Println(err)
