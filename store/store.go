@@ -11,6 +11,14 @@ import (
 	"github.com/cipherowl-ai/addressdb/securedata"
 )
 
+// BloomStats represents statistics about a Bloom filter
+type BloomStats struct {
+	K                 uint   `json:"k"`                  // Number of hash functions
+	M                 uint   `json:"m"`                  // Bit array size
+	N                 uint32 `json:"n"`                  // Number of elements added
+	EstimatedCapacity uint   `json:"estimated_capacity"` // Estimated element capacity
+}
+
 type BloomFilterStore struct {
 	filter            *bloom.BloomFilter
 	addressHandler    address.AddressHandler
@@ -118,6 +126,19 @@ func (bf *BloomFilterStore) PrintStats() {
 	fmt.Printf("  📏 M (bit array size): %d\n", bf.filter.Cap())
 	fmt.Printf("  🔢 N (number of elements added): %d\n", bf.filter.ApproximatedSize())
 	fmt.Printf("  💪 Estimated elements capacity: %d\n", bf.filter.Cap()/bf.filter.K())
+}
+
+// GetStats returns the current statistics of the Bloom filter
+func (bf *BloomFilterStore) GetStats() BloomStats {
+	bf.mu.RLock()
+	defer bf.mu.RUnlock()
+
+	return BloomStats{
+		K:                 bf.filter.K(),
+		M:                 bf.filter.Cap(),
+		N:                 bf.filter.ApproximatedSize(),
+		EstimatedCapacity: bf.filter.Cap() / bf.filter.K(),
+	}
 }
 
 func (bf *BloomFilterStore) LoadFromFile(filePath string) error {

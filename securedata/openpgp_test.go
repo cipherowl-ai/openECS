@@ -41,7 +41,7 @@ func TestGpgKeys(t *testing.T) {
 	pubkeyPath := "testdata/pubkey.asc"
 	privkeyPath := "testdata/privkey.asc"
 
-	handler, err := NewPGPSecureHandler(WithPublicKeyPath(pubkeyPath), WithPrivateKeyPath(privkeyPath, "password123"))
+	handler, err := NewPGPSecureHandler(WithPublicKeyPath(pubkeyPath), WithPrivateKeyPath(privkeyPath, "123456"))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
 
