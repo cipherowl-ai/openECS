@@ -4,7 +4,7 @@
 
 ### Encoder to build a bloomfilter from a list of addresses
 ```bash
-pa-cli encode --input ./addresses.txt --output ./bloomfilter.gob -n 1000000 -p 0.000001 --private-key-file ./private.asc --public-key-file ./public.asc --private-key-passphrase "123456"
+pa-cli check --input ./addresses.txt  --private-key-file securedata/testdata/privkey.asc --public-key-file  securedata/testdata/pubkey.asc --private-key-passphrase "123456" --output ./bloomfilter.gob
 ```
 
 - `-input`: Input file path, one address per line
@@ -18,7 +18,7 @@ pa-cli encode --input ./addresses.txt --output ./bloomfilter.gob -n 1000000 -p 0
 ### Console based interactive client for testing bloomfilter
 
 ```bash
-pa-cli check -f=./bloomfilter.gob --private-key-file ./private.asc --public-key-file ./public.asc --private-key-passphrase "123456"
+pa-cli check -f=./bloomfilter.gob --private-key-file securedata/testdata/privkey.asc --public-key-file  securedata/testdata/pubkey.asc --private-key-passphrase "123456"
 ```
 
 - `-f`: Path to the bloomfilter file
