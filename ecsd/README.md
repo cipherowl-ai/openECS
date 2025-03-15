@@ -8,7 +8,7 @@ This is a Edge compliance service for Bloom filter. It is a simple HTTP service 
 2. POST `/batch-check` - check a list of addresses in JSON format (array of addresses), where the body is {"addresses":["address1","address2"]}, the list cannot be longer than 100 elements
 3. GET `/inspect` - inspect the Bloom filter file and print the statistics and last update
 4. GET `/health` - check the health of the service
-5. POST `/update` - signal the filter update, the server will download the new filter from CO_BASE_URL with CO_CLIENT_ID and CO_CLIENT_SECRET credentials, and replace the path bloomfilter.gob. The new filter will be reloaded asynchronously in the background.
+5. PATCH `/update` - signal the filter update, the server will download the new filter from CO_BASE_URL with CO_CLIENT_ID and CO_CLIENT_SECRET credentials, and replace the path bloomfilter.gob. The new filter will be reloaded asynchronously in the background.
 
 ## Configuration
 

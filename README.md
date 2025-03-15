@@ -133,6 +133,38 @@ Batch mode:
 cat my_addresses.txt | go run cmd/cli/main.go batch-check -f bloomfilter.gob --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
 ```
 
+## Run the ECSD service
+
+```bash
+go run ecsd/main.go -f bloomfilter.gob -p 8080 -r 20 -b 5 
+```
+
+To use encryption keys, you can use the following command:
+
+```bash
+go run ecsd/main.go -f bloomfilter.gob -p 8080 -r 20 -b 5 -private-key-file securedata/testdata/privkey.asc -public-key-file securedata/testdata/pubkey.asc
+```
+
+To test the ECSD service, you can use the following command:
+
+```bash
+curl -X GET "http://localhost:8080/check?address=0x094b1D4CC901C182EF049d86c4245Cfb61704A8a" -H "Content-Type: application/json"
+```
+
+Batch check
+
+```
+curl -X POST "http://localhost:8080/batch-check" -H "Content-Type: application/json" -d '{"addresses":["0x094b1D4CC901C182EF049d86c4245Cfb61704A8a","0x31bD83177c0fe1D4f0E6451507b969021C8293E6"]}'
+``` 
+
+Inspect the Bloom filter
+
+```bash
+curl -X GET "http://localhost:8080/inspect" -H "Content-Type: application/json"
+```
+
+
+
 ## Large-Scale Example
 
 Building a Bloom filter with 24 million Ethereum addresses:

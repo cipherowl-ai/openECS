@@ -41,12 +41,15 @@ var (
 	clientSecret         string
 	baseURL              string
 	environment          string
+	updateLimiter        = rate.NewLimiter(rate.Limit(0.2), 1) // 1 request every 5 seconds for updates
+	lastFilterLoadTime   time.Time                             // Tracks when filter was last successfully loaded
 )
 
 type Response struct {
-	Query   string `json:"query"`
-	InSet   bool   `json:"in_set"`
-	Message string `json:"message"`
+	Query        string            `json:"query"`
+	InSet        bool              `json:"in_set"`
+	Message      string            `json:"message"`
+	Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 }
 
 type BatchCheckRequest struct {
@@ -54,10 +57,11 @@ type BatchCheckRequest struct {
 }
 
 type BatchCheckResponse struct {
-	Found         []string `json:"found"`
-	NotFound      []string `json:"notfound"`
-	FoundCount    int      `json:"found_count"`
-	NotFoundCount int      `json:"notfound_count"`
+	Found         []string          `json:"found"`
+	NotFound      []string          `json:"notfound"`
+	FoundCount    int               `json:"found_count"`
+	NotFoundCount int               `json:"notfound_count"`
+	Explanations  map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -108,12 +112,24 @@ func main() {
 		options = append(options, store.WithSecureDataHandler(pgpHandler))
 	}
 
+	// Create address handler
 	addressHandler := &address.EVMAddressHandler{}
-	filter, lasterror = store.NewBloomFilterStoreFromFile(*filename, addressHandler, options...)
 
+	// First create an empty filter
+	var err error
+	filter, err = store.NewBloomFilterStore(addressHandler, options...)
+	if err != nil {
+		logger.Fatalf("Failed to create empty Bloom filter: %v", err)
+	}
+
+	// Then load the filter from file
+	lasterror = filter.LoadFromFile(*filename)
 	if lasterror != nil {
 		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
 	}
+
+	// Record initial load time
+	lastFilterLoadTime = time.Now().UTC()
 
 	// Create a file watcher notifier.
 	notifier, err := reload.NewFileWatcherNotifier(*filename, 2*time.Second)
@@ -135,7 +151,7 @@ func main() {
 	r.Handle("/check", rateLimitMiddleware(http.HandlerFunc(checkHandler))).Methods("GET")
 	r.Handle("/batch-check", rateLimitMiddleware(http.HandlerFunc(batchCheckHandler))).Methods("POST")
 	r.Handle("/inspect", rateLimitMiddleware(http.HandlerFunc(inspectHandler))).Methods("GET")
-	r.Handle("/update", rateLimitMiddleware(http.HandlerFunc(updateHandler))).Methods("POST")
+	r.Handle("/update", updateRateLimitMiddleware(http.HandlerFunc(updateHandler))).Methods("PATCH") //limit patch requests, so backend won't get overwhelmed
 	r.Handle("/health", http.HandlerFunc(healthHandler)).Methods("GET")
 
 	srv := &http.Server{
@@ -185,6 +201,15 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 		Message: "",
 	}
 
+	// Only include explanations if the bot caller header is present
+	if r.Header.Get("__llm_bot_caller__") == "on" {
+		response.Explanations = map[string]string{
+			"query":   "The address that was queried",
+			"in_set":  "Whether the address was found in the Bloom filter (true) or not (false). Note that Bloom filters may have false positives but never false negatives",
+			"message": "Additional information or error message",
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -230,6 +255,16 @@ func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 		NotFoundCount: len(notFound),
 	}
 
+	// Only include explanations if the bot caller header is present
+	if r.Header.Get("__llm_bot_caller__") == "on" {
+		response.Explanations = map[string]string{
+			"found":          "Array of addresses that were found in the Bloom filter",
+			"notfound":       "Array of addresses that were not found in the Bloom filter",
+			"found_count":    "Number of addresses that were found in the Bloom filter",
+			"notfound_count": "Number of addresses that were not found in the Bloom filter",
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -238,24 +273,28 @@ func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 func inspectHandler(w http.ResponseWriter, r *http.Request) {
 	stats := filter.GetStats()
 
-	// Get file info for last modification time
-	fileInfo, err := os.Stat("bloomfilter.gob")
-	lastUpdate := ""
-	if err == nil {
-		lastUpdate = fileInfo.ModTime().Format(time.RFC3339)
-	}
+	lastUpdate := lastFilterLoadTime.Format(time.RFC3339)
 
 	response := struct {
-		Stats      store.BloomStats `json:"stats"`
-		LastUpdate string           `json:"last_update"`
-		Error      string           `json:"error,omitempty"`
+		Stats        store.BloomStats  `json:"stats"`
+		LastUpdate   string            `json:"last_update"`
+		Error        string            `json:"error,omitempty"`
+		Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 	}{
 		Stats:      stats,
 		LastUpdate: lastUpdate,
 	}
 
-	if err != nil {
-		response.Error = err.Error()
+	// Only include explanations if the bot caller header is present
+	if r.Header.Get("__llm_bot_caller__") == "on" {
+		response.Explanations = map[string]string{
+			"k":                   "Number of hash functions used in the Bloom filter",
+			"m":                   "Size of the bit array in the Bloom filter",
+			"n":                   "Number of elements added to the Bloom filter",
+			"estimated_capacity":  "Estimated maximum capacity of the Bloom filter before exceeding the false positive probability threshold",
+			"last_update":         "ISO 8601 timestamp of when the Bloom filter was last updated",
+			"false_positive_rate": "Estimated probability that the filter will incorrectly report that an element is in the set when it is not",
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -267,6 +306,9 @@ func inspectHandler(w http.ResponseWriter, r *http.Request) {
 // reload it safely using a mutex
 // ensure the reload is done before replacing the filter variable
 // run filter stats and update the stats in the response
+// TODO:
+// 1. test with CO backend with real data
+// 2. test with failure cases
 func updateHandler(w http.ResponseWriter, r *http.Request) {
 	// Create HTTP client
 	client := &http.Client{
@@ -327,6 +369,9 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update the last load time
+	lastFilterLoadTime = time.Now().UTC()
+
 	// Clear any previous errors
 	lasterror = nil
 
@@ -335,13 +380,27 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare response
 	response := struct {
-		Status  string           `json:"status"`
-		Message string           `json:"message"`
-		Stats   store.BloomStats `json:"stats"`
+		Status       string            `json:"status"`
+		Message      string            `json:"message"`
+		Stats        store.BloomStats  `json:"stats"`
+		Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 	}{
 		Status:  "success",
 		Message: "Bloom filter updated successfully",
 		Stats:   stats,
+	}
+
+	// Only include explanations if the bot caller header is present
+	if r.Header.Get("__llm_bot_caller__") == "on" {
+		response.Explanations = map[string]string{
+			"status":                    "Status of the update operation (success/error)",
+			"message":                   "Descriptive message about the update operation",
+			"stats.k":                   "Number of hash functions used in the Bloom filter",
+			"stats.m":                   "Size of the bit array in the Bloom filter",
+			"stats.n":                   "Number of elements added to the Bloom filter",
+			"stats.estimated_capacity":  "Estimated maximum capacity of the Bloom filter",
+			"stats.false_positive_rate": "Estimated probability of false positives",
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -351,9 +410,10 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 // Health check endpoint
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	response := struct {
-		Status  string `json:"status"`
-		Message string `json:"message,omitempty"`
-		Filter  string `json:"filter,omitempty"`
+		Status       string            `json:"status"`
+		Message      string            `json:"message,omitempty"`
+		Filter       string            `json:"filter,omitempty"`
+		Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 	}{
 		Status: "ok",
 	}
@@ -362,16 +422,28 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	if filter == nil {
 		response.Status = "error"
 		response.Message = "Bloom filter not loaded"
-		w.WriteHeader(http.StatusServiceUnavailable)
 	} else if lasterror != nil {
 		response.Status = "error"
 		response.Message = lasterror.Error()
-		w.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		// Filter is loaded, add stats
 		stats := filter.GetStats()
 		response.Filter = fmt.Sprintf("loaded (elements: %d, capacity: %d)",
 			stats.N, stats.EstimatedCapacity)
+	}
+
+	// Set appropriate HTTP status code based on response status
+	if response.Status != "ok" {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+
+	// Only include explanations if the bot caller header is present
+	if r.Header.Get("__llm_bot_caller__") == "on" {
+		response.Explanations = map[string]string{
+			"status":  "Health status of the service (ok/error)",
+			"message": "Error message if status is error",
+			"filter":  "Information about the loaded Bloom filter, including number of elements and capacity",
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -397,6 +469,16 @@ func rateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !limiter.Allow() {
 			http.Error(w, "Too many requests", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func updateRateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !updateLimiter.Allow() {
+			http.Error(w, "Too many update requests, limit is 1 per second", http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)

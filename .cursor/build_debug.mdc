@@ -8,8 +8,7 @@ alwaysApply: false
 ## Testing
 
 - Run tests in specific packages: `cd <package-dir> && go test`
-- Run all tests: `go test ./...`
-- Run tests with verbose output: `go test -v`
+- Run all tests with verbose output: `go test ./... -v`
 
 ## Interpreting Errors
 
@@ -38,4 +37,5 @@ alwaysApply: false
 - Unregistered CLI commands
 - Mismatches between interface definitions and implementations
 - Encryption/decryption key handling
+- run `which go` to figure the go version if there is any toolchain issue
 

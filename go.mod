@@ -2,8 +2,6 @@ module github.com/cipherowl-ai/addressdb
 
 go 1.21
 
-toolchain go1.21.11
-
 require (
 	github.com/ProtonMail/gopenpgp/v3 v3.0.0-beta.2-proton
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
