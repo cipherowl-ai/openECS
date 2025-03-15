@@ -7,6 +7,12 @@ ensuring both confidentiality and authenticity. Additionally, it includes consid
 *RFC9580**, which provide modern cryptographic standards including support for elliptic curve cryptography (ECC) and
 post-quantum cryptography (PQC), respectively.
 
+## How to test the PGP encryption and signing
+
+```bash
+go test -v ./securedata
+```
+
 ## Why Choose GopenPGP v3 for Encryption and Signing?
 
 ### 1. **Sign-Then-Encrypt Approach**

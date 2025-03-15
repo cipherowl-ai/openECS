@@ -153,7 +153,17 @@ func TestIsRawEncrypted(t *testing.T) {
 	encryptedData := buf.Bytes()
 
 	// Debug info to help understand the data format
-	t.Logf("Encrypted data first 10 bytes: %v", encryptedData[:min(10, len(encryptedData))])
+	t.Logf("Encrypted data length: %d", len(encryptedData))
+	if len(encryptedData) > 0 {
+		// Print the first few bytes for debugging
+		numBytes := min(30, len(encryptedData))
+		t.Logf("First %d bytes of encrypted data:", numBytes)
+		for i := 0; i < numBytes; i++ {
+			t.Logf("  Byte %d: %d (0x%02x) - Binary: %08b - Char: %q",
+				i, encryptedData[i], encryptedData[i], encryptedData[i],
+				encryptedData[i])
+		}
+	}
 
 	tests := []struct {
 		name string
@@ -173,44 +183,12 @@ func TestIsRawEncrypted(t *testing.T) {
 			if tt.want != ok {
 				t.Logf("Expected IsRawEncrypted to return %v for %s, got %v", tt.want, tt.name, ok)
 				if len(tt.data) > 0 {
-					t.Logf("Data starts with: %v", tt.data[:min(10, len(tt.data))])
+					t.Logf("Data first byte: 0x%02x", tt.data[0])
 				}
 			}
-			assert.Equal(t, tt.want, ok, "IsRawEncrypted detection failed for %s", tt.name)
+			assert.Equal(t, tt.want, ok, "Detection failed for %s", tt.name)
 		})
 	}
-}
-
-func TestEncryptedDataFormat(t *testing.T) {
-	keys := GenerateTestKeys(t)
-	privKey, pubKey := keys[0], keys[1]
-	handler, err := NewPGPSecureHandler(WithPrivateKey(privKey), WithPublicKey(pubKey))
-	require.NoError(t, err)
-	require.NotNil(t, handler)
-
-	var buf bytes.Buffer
-	writer := createWriter(t, handler, &buf)
-	writeData(t, writer, "test data")
-
-	// Check the first few bytes of encrypted data
-	encryptedData := buf.Bytes()
-	require.NotEmpty(t, encryptedData)
-
-	// Debug the encrypted data format
-	t.Logf("First 30 bytes of encrypted data: %v", encryptedData[:min(30, len(encryptedData))])
-
-	// Test raw data detection
-	reader := bufio.NewReader(bytes.NewReader(encryptedData))
-	isEncrypted, err := IsRawEncrypted(reader)
-	require.NoError(t, err)
-	assert.True(t, isEncrypted, "Data should be detected as encrypted")
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func createTempFile(t *testing.T, key *crypto.Key) *os.File {

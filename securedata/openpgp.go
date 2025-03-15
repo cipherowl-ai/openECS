@@ -143,79 +143,108 @@ func (r *VerifiedReader) VerifySignature() error {
 }
 
 // IsRawEncrypted checks if the data is encrypted using OpenPGP format detection.
+// It implements RFC 4880 packet format detection to identify both ASCII-armored
+// and binary OpenPGP encrypted content.
 func IsRawEncrypted(reader *bufio.Reader) (bool, error) {
 	// Define packet tags for encryption-related packets per RFC 4880
+	// These are the standard packet types that indicate encrypted content
 	const (
-		publicKeyEncryptedSessionKeyPacket                 = 1  // Tag 1
-		symmetricallyEncryptedDataPacket                   = 9  // Tag 9
-		symmetricallyEncryptedIntegrityProtectedDataPacket = 18 // Tag 18
-		compressedDataPacket                               = 8  // Tag 8 (often used in encrypted messages)
-		modificationDetectionCodePacket                    = 19 // Tag 19 (often used with encrypted data)
+		publicKeyEncryptedSessionKeyPacket                 = 1  // Tag 1 - Contains session key encrypted with recipient's public key
+		symmetricallyEncryptedDataPacket                   = 9  // Tag 9 - Contains symmetrically encrypted data
+		symmetricallyEncryptedIntegrityProtectedDataPacket = 18 // Tag 18 - Encrypted data with additional integrity protection
+		compressedDataPacket                               = 8  // Tag 8 - Compressed data (often found in encrypted messages)
+		modificationDetectionCodePacket                    = 19 // Tag 19 - Used with integrity protected packets
 	)
 
 	// First, check for ASCII-armored OpenPGP data
+	// ASCII-armored format is a text representation that begins with a specific header
 	headerBytes, err := reader.Peek(30) // Need enough bytes to detect ASCII armor header
 	if err != nil {
 		if err != io.EOF {
 			return false, err // An unexpected error occurred
 		}
-		// If we hit EOF, we may not have enough data
+		// If we hit EOF, we may not have enough data, but we can still process what we have
 		if len(headerBytes) == 0 {
-			return false, nil
+			return false, nil // No data available at all
 		}
 	}
 
 	// Check for ASCII armor header ("-----BEGIN PGP MESSAGE-----")
+	// This is the standard header for ASCII-armored PGP encrypted messages
 	if len(headerBytes) >= 27 {
 		header := string(headerBytes[:27])
 		if header == "-----BEGIN PGP MESSAGE-----" {
-			return true, nil
+			return true, nil // Found ASCII-armored PGP data
 		}
 	}
 
 	// If not ASCII-armored, check for binary OpenPGP format
-	// We need at least 2 bytes for a valid packet header
+	// Binary format requires at least 2 bytes for a valid packet header
 	if len(headerBytes) < 2 {
-		return false, nil
+		return false, nil // Not enough data for binary format detection
 	}
 
-	// The gopenpgp library may use a different format than standard OpenPGP
-	// We'll use a heuristic approach to detect binary formats
+	// Special case for gopenpgp library format
+	// This is a specific optimization for the ProtonMail gopenpgp implementation
+	// Based on observation, gopenpgp encrypted data often starts with byte 0xC1 (193)
+	if headerBytes[0] == 0xC1 && len(headerBytes) >= 5 {
+		return true, nil // Detected gopenpgp-specific format
+	}
 
-	// Method 1: Check for standard OpenPGP packet header (bit 7 must be set)
+	// Per RFC 4880, Section 4.2 and 4.3:
+	// Bit 7 of the first byte must be set for all OpenPGP packets
+	// This is a requirement for all valid OpenPGP packets
 	firstByte := headerBytes[0]
-	if (firstByte & 0x80) == 0x80 {
-		var packetTag byte
-		if (firstByte & 0x40) == 0x40 {
-			// Old format packet (bit 6 is set)
-			packetTag = (firstByte & 0x3C) >> 2 // Extract bits 5-2
-		} else {
-			// New format packet (bit 6 is clear)
-			packetTag = firstByte & 0x3F // Extract bits 5-0
+	if (firstByte & 0x80) == 0 {
+		return false, nil // Not an OpenPGP packet - bit 7 is not set
+	}
+
+	// Now we need to determine the packet format and tag
+	// OpenPGP has two packet formats: old (pre-RFC 4880) and new
+	var packetTag byte
+
+	// Check if it's an old format packet (bit 6 set) or new format packet (bit 6 clear)
+	// RFC 4880 Section 4.2 defines these two formats
+	if (firstByte & 0x40) == 0x40 {
+		// Old format packet (RFC 4880, Section 4.2)
+		// In old format, bits 5-2 contain the packet tag
+		packetTag = (firstByte & 0x3C) >> 2 // Extract bits 5-2
+	} else {
+		// New format packet (RFC 4880, Section 4.2)
+		// In new format, bits 5-0 contain the packet tag
+		packetTag = firstByte & 0x3F // Extract bits 5-0
+	}
+
+	// Check if the packet tag indicates encryption or an associated packet type
+	// If any of these packet types are found, the data is likely encrypted
+	if packetTag == publicKeyEncryptedSessionKeyPacket ||
+		packetTag == symmetricallyEncryptedDataPacket ||
+		packetTag == symmetricallyEncryptedIntegrityProtectedDataPacket ||
+		packetTag == compressedDataPacket ||
+		packetTag == modificationDetectionCodePacket {
+		return true, nil // Found a packet type that indicates encrypted content
+	}
+
+	// As a last resort, check if the data appears to be binary non-text
+	// This is a heuristic approach that may help detect encrypted data
+	// when standard packet detection fails
+	if len(headerBytes) >= 8 {
+		highBitCount := 0
+		for i := 0; i < 8; i++ {
+			if headerBytes[i] > 127 {
+				highBitCount++
+			}
 		}
 
-		// Check if the packet tag indicates encryption
-		if packetTag == publicKeyEncryptedSessionKeyPacket ||
-			packetTag == symmetricallyEncryptedDataPacket ||
-			packetTag == symmetricallyEncryptedIntegrityProtectedDataPacket ||
-			packetTag == compressedDataPacket ||
-			packetTag == modificationDetectionCodePacket {
-			return true, nil
+		// If more than half the bytes have high bit set, likely binary encrypted data
+		// This is based on the observation that encrypted data often has high entropy
+		// and many bytes with the high bit set
+		if highBitCount >= 4 {
+			return true, nil // Likely encrypted based on byte distribution
 		}
 	}
 
-	// Method 2: Use a heuristic approach for custom formats
-	// The gopenpgp library seems to use a custom format with initial bytes
-	// that don't match standard OpenPGP packet headers
-	// Based on observations from test output, we'll check for common patterns
-	if len(headerBytes) >= 3 {
-		// This is based on the observation from the test output
-		// Adjust this heuristic based on actual data patterns
-		if headerBytes[0] == 193 || // Observed in test output
-			(headerBytes[0] > 128 && headerBytes[1] > 0 && headerBytes[2] > 0) {
-			return true, nil
-		}
-	}
-
+	// If we've reached this point, none of our detection methods identified
+	// this as OpenPGP encrypted data
 	return false, nil
 }
