@@ -25,7 +25,13 @@ type tokenResponse struct {
 
 // configurePGPHandler sets up the OpenPGPSecureHandler based on provided flags.
 func configurePGPHandler() ([]store.Option, error) {
+	var options []store.Option
 	pgpOptions := []securedata.Option{}
+	// If no private key or public key is provided, return nil
+	if privateKeyFile == "" && publicKeyFile == "" {
+		return options, nil
+	}
+
 	if privateKeyFile != "" {
 		pgpOptions = append(pgpOptions, securedata.WithPrivateKeyPath(privateKeyFile, privateKeyPassphrase))
 	}
@@ -33,7 +39,6 @@ func configurePGPHandler() ([]store.Option, error) {
 		pgpOptions = append(pgpOptions, securedata.WithPublicKeyPath(publicKeyFile))
 	}
 
-	var options []store.Option
 	if len(pgpOptions) > 0 {
 		pgpHandler, err := securedata.NewPGPSecureHandler(pgpOptions...)
 		if err != nil {
@@ -80,7 +85,8 @@ func checkAuth(clientID, clientSecret, env string) error {
 		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonPayload))
+	url := fmt.Sprintf("https://%s%s", baseURL, tokenEndpoint)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
 	}

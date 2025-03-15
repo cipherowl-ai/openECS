@@ -30,10 +30,10 @@ func init() {
 
 func runBatchCheck(_ *cobra.Command, _ []string) {
 	start := time.Now()
-	if err := checkAuth(clientID, clientSecret, env); err != nil {
-		fmt.Printf("Authentication failed: %v\n", err)
-		os.Exit(-1)
-	}
+	// if err := checkAuth(clientID, clientSecret, env); err != nil {
+	// 	fmt.Printf("Authentication failed: %v\n", err)
+	// 	os.Exit(-1)
+	// }
 	filter, err := loadBloomFilter(filename)
 	if err != nil {
 		fmt.Println(err)

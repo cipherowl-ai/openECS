@@ -3,10 +3,11 @@ package securedata
 import (
 	"bufio"
 	"errors"
-	"github.com/ProtonMail/gopenpgp/v3/crypto"
-	"github.com/ProtonMail/gopenpgp/v3/profile"
 	"io"
 	"os"
+
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 )
 
 // Option defines a function that can modify OpenPGPSecureHandler and return an error.
@@ -141,38 +142,58 @@ func (r *VerifiedReader) VerifySignature() error {
 	return nil
 }
 
-// IsRawEncrypted checks if the data is encrypted.
+// IsRawEncrypted checks if the data is encrypted using OpenPGP format detection.
 func IsRawEncrypted(reader *bufio.Reader) (bool, error) {
-	// Define packet tags for asymmetric encryption detection
+	// Define packet tags for encryption-related packets per RFC 4880
 	const (
-		publicKeyEncryptedSessionKeyPacket = 1 // Tag 1
-		symmetricallyEncryptedDataPacket   = 9 // Tag 9
-		compressedDataPacket               = 8 // Tag 8 (often used in encrypted messages)
-		onePassSignaturePacket             = 4 // Tag 4 (used in signed and encrypted messages)
-		signaturePacket                    = 2 // Tag 2 (digital signatures)
+		publicKeyEncryptedSessionKeyPacket                 = 1  // Tag 1
+		symmetricallyEncryptedDataPacket                   = 9  // Tag 9
+		symmetricallyEncryptedIntegrityProtectedDataPacket = 18 // Tag 18
+		compressedDataPacket                               = 8  // Tag 8 (often used in encrypted messages)
+		modificationDetectionCodePacket                    = 19 // Tag 19 (often used with encrypted data)
 	)
 
-	// Peek at the first 10 bytes to check for packet types
-	// Attempt to peek at the first 20 bytes
-	headerBytes, err := reader.Peek(20)
+	// Peek at the first few bytes without consuming them
+	headerBytes, err := reader.Peek(4) // Need at least the first bytes to detect packet format
 	if err != nil {
 		if err != io.EOF {
 			return false, err // An unexpected error occurred
 		}
-		// Handle cases where the file is smaller than 20 bytes (EOF reached)
-		headerBytes = headerBytes[:len(headerBytes)] // Use available bytes
+		// If we hit EOF, we don't have enough data for a valid OpenPGP packet
+		if len(headerBytes) < 2 {
+			return false, nil
+		}
 	}
 
-	// Iterate over the peeked bytes to find packet tags related to encryption
-	for _, b := range headerBytes {
-		packetTag := b & 0x3F // Extract packet tag from each byte
-		if packetTag == publicKeyEncryptedSessionKeyPacket ||
-			packetTag == symmetricallyEncryptedDataPacket ||
-			packetTag == compressedDataPacket ||
-			packetTag == onePassSignaturePacket ||
-			packetTag == signaturePacket {
-			return true, nil
-		}
+	// Check if we have a valid OpenPGP packet header
+	if len(headerBytes) < 2 {
+		return false, nil
+	}
+
+	// Check the first byte to determine packet format (old or new)
+	firstByte := headerBytes[0]
+
+	// Check if this is a valid OpenPGP packet (bit 7 must be set)
+	if (firstByte & 0x80) == 0 {
+		return false, nil // Not an OpenPGP packet
+	}
+
+	var packetTag byte
+	if (firstByte & 0x40) == 0x40 {
+		// Old format packet (bit 6 is set)
+		packetTag = (firstByte & 0x3C) >> 2 // Extract bits 5-2
+	} else {
+		// New format packet (bit 6 is clear)
+		packetTag = firstByte & 0x3F // Extract bits 5-0
+	}
+
+	// Check if the packet tag indicates encryption
+	if packetTag == publicKeyEncryptedSessionKeyPacket ||
+		packetTag == symmetricallyEncryptedDataPacket ||
+		packetTag == symmetricallyEncryptedIntegrityProtectedDataPacket ||
+		packetTag == compressedDataPacket ||
+		packetTag == modificationDetectionCodePacket {
+		return true, nil
 	}
 
 	return false, nil
