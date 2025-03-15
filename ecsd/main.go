@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/cipherowl-ai/addressdb/address"
@@ -66,6 +67,22 @@ type BatchCheckResponse struct {
 
 type UpdateRequest struct {
 	URL string `json:"url"`
+}
+
+// The mapping of valid header values for efficient lookup
+var llmCallerValues = map[string]bool{
+	"on":   true,
+	"true": true,
+	"1":    true,
+	"yes":  true,
+	"y":    true,
+}
+
+// shouldIncludeExplanations checks if explanations for LLM bots should be included in the response
+// Using a map lookup with case-insensitive comparison for maximum compatibility and O(1) time complexity
+func shouldIncludeExplanations(r *http.Request) bool {
+	headerValue := strings.ToLower(r.Header.Get("__llm_bot_caller__"))
+	return llmCallerValues[headerValue]
 }
 
 func main() {
@@ -202,11 +219,11 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only include explanations if the bot caller header is present
-	if r.Header.Get("__llm_bot_caller__") == "on" {
+	if shouldIncludeExplanations(r) {
 		response.Explanations = map[string]string{
-			"query":   "The address that was queried",
-			"in_set":  "Whether the address was found in the Bloom filter (true) or not (false). Note that Bloom filters may have false positives but never false negatives",
-			"message": "Additional information or error message",
+			"query":   "Queried address",
+			"in_set":  "Address presence in Bloom filter. May have false positives but never false negatives",
+			"message": "Error or additional info",
 		}
 	}
 
@@ -256,12 +273,12 @@ func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only include explanations if the bot caller header is present
-	if r.Header.Get("__llm_bot_caller__") == "on" {
+	if shouldIncludeExplanations(r) {
 		response.Explanations = map[string]string{
-			"found":          "Array of addresses that were found in the Bloom filter",
-			"notfound":       "Array of addresses that were not found in the Bloom filter",
-			"found_count":    "Number of addresses that were found in the Bloom filter",
-			"notfound_count": "Number of addresses that were not found in the Bloom filter",
+			"found":          "Addresses found in filter",
+			"notfound":       "Addresses not found in filter",
+			"found_count":    "Count of found addresses",
+			"notfound_count": "Count of addresses not found",
 		}
 	}
 
@@ -286,14 +303,14 @@ func inspectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only include explanations if the bot caller header is present
-	if r.Header.Get("__llm_bot_caller__") == "on" {
+	if shouldIncludeExplanations(r) {
 		response.Explanations = map[string]string{
-			"k":                   "Number of hash functions used in the Bloom filter",
-			"m":                   "Size of the bit array in the Bloom filter",
-			"n":                   "Number of elements added to the Bloom filter",
-			"estimated_capacity":  "Estimated maximum capacity of the Bloom filter before exceeding the false positive probability threshold",
-			"last_update":         "ISO 8601 timestamp of when the Bloom filter was last updated",
-			"false_positive_rate": "Estimated probability that the filter will incorrectly report that an element is in the set when it is not",
+			"k":                   "Number of hash functions",
+			"m":                   "Bit array size",
+			"n":                   "Elements count",
+			"estimated_capacity":  "Maximum capacity before exceeding false positive threshold",
+			"last_update":         "Last reload timestamp (UTC)",
+			"false_positive_rate": "Current false positive probability (should be less than configured threshold)",
 		}
 	}
 
@@ -391,15 +408,15 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only include explanations if the bot caller header is present
-	if r.Header.Get("__llm_bot_caller__") == "on" {
+	if shouldIncludeExplanations(r) {
 		response.Explanations = map[string]string{
-			"status":                    "Status of the update operation (success/error)",
-			"message":                   "Descriptive message about the update operation",
-			"stats.k":                   "Number of hash functions used in the Bloom filter",
-			"stats.m":                   "Size of the bit array in the Bloom filter",
-			"stats.n":                   "Number of elements added to the Bloom filter",
-			"stats.estimated_capacity":  "Estimated maximum capacity of the Bloom filter",
-			"stats.false_positive_rate": "Estimated probability of false positives",
+			"status":                    "Operation status",
+			"message":                   "Status description",
+			"stats.k":                   "Hash function count",
+			"stats.m":                   "Bit array size",
+			"stats.n":                   "Element count",
+			"stats.estimated_capacity":  "Maximum capacity estimate",
+			"stats.false_positive_rate": "Current false positive probability",
 		}
 	}
 
@@ -438,11 +455,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Only include explanations if the bot caller header is present
-	if r.Header.Get("__llm_bot_caller__") == "on" {
+	if shouldIncludeExplanations(r) {
 		response.Explanations = map[string]string{
-			"status":  "Health status of the service (ok/error)",
-			"message": "Error message if status is error",
-			"filter":  "Information about the loaded Bloom filter, including number of elements and capacity",
+			"status":  "Service status (ok/error)",
+			"message": "Error details",
+			"filter":  "Bloom filter stats summary",
 		}
 	}
 
