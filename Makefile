@@ -10,9 +10,20 @@ TARGET_DIR=target
 DEBUG_FLAGS=-gcflags="all=-N -l"
 RELEASE_FLAGS=-ldflags="-s -w" -trimpath
 
-# Build targets
-all: fmt clean build-debug build-release
+# Protobuf parameters
+PROTOC=protoc
+PROTO_DIR=proto
 
+# Build targets
+all: proto fmt clean build-debug build-release
+
+# Generate protobuf code
+proto:
+	@echo "Generating Go code from protobuf definitions..."
+	$(PROTOC) --go_out=. --go_opt=paths=source_relative \
+		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
+		$(PROTO_DIR)/ecsd.proto
+	@echo "Proto generation complete"
 
 # format
 fmt:
@@ -21,6 +32,8 @@ fmt:
 	$(GOCMD) fmt ./reload
 	$(GOCMD) fmt ./securedata
 	$(GOCMD) fmt ./store
+	$(GOCMD) fmt ./proto
+	$(GOCMD) fmt ./ecsd
 
 
 build-debug: prepare
@@ -51,4 +64,4 @@ build-linux-release: prepare
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-server ./cmd/server
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-ecsd ./ecsd
 
-.PHONY: all build-debug build-release clean build-linux-debug build-linux-release prepare
+.PHONY: all proto build-debug build-release clean build-linux-debug build-linux-release prepare

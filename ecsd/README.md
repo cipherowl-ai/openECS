@@ -1,6 +1,6 @@
 # ECS Service for Bloom Filter
 
-This is a Edge compliance service for Bloom filter. It is a simple HTTP service that can be used to check if an address is in the Bloom filter.
+This is a Edge compliance service for Bloom filter. It is a simple HTTP service with GRPC interface that can be used to check if an address is in the Bloom filter.
 
 ## Features
 
@@ -53,8 +53,9 @@ go build -o ecsd
 # Set rate limits
 ./ecsd -r 50 -b 10
 
-# Use encryption keys
-./ecsd -private-key-file /path/to/private.key -public-key-file /path/to/public.key
+# Use environment variables with GRPC port 9090 and HTTP port 8080, plus encryption keys
+export KEY_PASSPHRASE=123456                    
+./ecsd -f bloomfilter.gob -p 8080 -gp 9090 -r 2000 -b 5000 -private-key-file securedata/testdata/privkey.asc -public-key-file securedata/testdata/pubkey.asc
 ```
 
 
@@ -187,3 +188,85 @@ curl http://localhost:8080/inspect -H "__llm_bot_caller__: 1" |jq
   }
 }
 ```
+
+## Using the gRPC Interface
+
+The ECSD service also provides a gRPC interface on port 9090 (by default). You can interact with it using tools like `grpcurl`.
+
+### List Available Services
+
+```bash
+grpcurl -plaintext localhost:9090 list
+```
+
+Output:
+```
+grpc.reflection.v1.ServerReflection
+grpc.reflection.v1alpha.ServerReflection
+proto.ECSd
+```
+
+### List Available Methods
+
+```bash
+grpcurl -plaintext localhost:9090 list proto.ECSd
+```
+
+Output:
+```
+proto.ECSd.BatchCheckAddresses
+proto.ECSd.CheckAddress
+proto.ECSd.InspectFilter
+```
+
+### Get Bloom Filter Statistics
+
+```bash
+grpcurl -plaintext localhost:9090 proto.ECSd.InspectFilter
+```
+
+Example output:
+```json
+{
+  "k": 7,
+  "m": "26168",
+  "n": "1007",
+  "estimatedCapacity": "3738",
+  "falsePositiveRate": 4.094744429579303e-05,
+  "lastUpdate": "2025-03-16T05:21:54Z"
+}
+```
+
+### Check if an Address is in the Filter
+
+```bash
+grpcurl -plaintext -d '{"address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"}' localhost:9090 proto.ECSd.CheckAddress
+```
+
+Example output:
+```json
+{
+  "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+}
+```
+
+### Batch Check Multiple Addresses
+
+```bash
+grpcurl -plaintext -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE"]}' localhost:9090 proto.ECSd.BatchCheckAddresses
+```
+
+Example output:
+```json
+{
+  "found": [
+    "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE"
+  ],
+  "notFound": [
+    "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+  ],
+  "foundCount": 1,
+  "notFoundCount": 1
+}
+```
+

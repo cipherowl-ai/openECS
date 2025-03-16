@@ -9,14 +9,15 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/reload"
-	"github.com/cipherowl-ai/addressdb/store"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/reload"
+	"github.com/cipherowl-ai/addressdb/store"
 
 	"strconv"
 
@@ -26,7 +27,7 @@ import (
 
 var (
 	filter    *store.BloomFilterStore
-	logger    = log.New(os.Stdout, "BloomServer: ", log.LstdFlags)
+	logger    = log.New(os.Stdout, "ECSd: ", log.LstdFlags)
 	lasterror error
 	ratelimit int
 	burst     int

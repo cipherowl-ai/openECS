@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/cipherowl-ai/addressdb/proto";
+
+// ECSd provides methods to check addresses against a Bloom filter
+service ECSd {
+  // CheckAddress checks if an address is in the Bloom filter
+  rpc CheckAddress(CheckAddressRequest) returns (CheckAddressResponse) {}
+  
+  // BatchCheckAddresses checks if multiple addresses are in the Bloom filter
+  rpc BatchCheckAddresses(BatchCheckRequest) returns (BatchCheckResponse) {}
+  
+  // InspectFilter returns statistics about the Bloom filter
+  rpc InspectFilter(InspectRequest) returns (InspectResponse) {}
+}
+
+// CheckAddressRequest contains an address to check
+message CheckAddressRequest {
+  string address = 1;
+}
+
+// CheckAddressResponse contains the result of an address check
+message CheckAddressResponse {
+  string address = 1;
+  bool in_set = 2;
+}
+
+// BatchCheckRequest contains multiple addresses to check
+message BatchCheckRequest {
+  repeated string addresses = 1;
+}
+
+// BatchCheckResponse contains the results of batch checking addresses
+message BatchCheckResponse {
+  repeated string found = 1;
+  repeated string not_found = 2;
+  int32 found_count = 3;
+  int32 not_found_count = 4;
+}
+
+// InspectRequest is empty as it doesn't require parameters
+message InspectRequest {
+}
+
+// InspectResponse contains Bloom filter statistics
+message InspectResponse {
+  int32 k = 1;                     // Number of hash functions
+  int64 m = 2;                     // Bit array size
+  int64 n = 3;                     // Elements count
+  int64 estimated_capacity = 4;    // Maximum capacity before exceeding false positive threshold
+  double false_positive_rate = 5;  // Current false positive probability
+  string last_update = 6;          // Last reload timestamp (UTC)
+} 
