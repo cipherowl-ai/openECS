@@ -31,6 +31,14 @@ cd addressdb
 go mod tidy
 ```
 
+You may want to have the latest version of the protobuf and grpc tools installed.
+```bash
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go get google.golang.org/grpc@latest
+go mod tidy
+```
+
 ## Library Usage
 
 Create a new Bloom filter store and add addresses to it:

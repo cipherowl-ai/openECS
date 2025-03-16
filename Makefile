@@ -28,7 +28,7 @@ proto:
 # format
 fmt:
 	$(GOCMD) fmt ./address
-	$(GOCMD) fmt cmd
+	$(GOCMD) fmt ./cmd
 	$(GOCMD) fmt ./reload
 	$(GOCMD) fmt ./securedata
 	$(GOCMD) fmt ./store
@@ -63,5 +63,14 @@ build-linux-release: prepare
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-cli ./cmd/cli
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-server ./cmd/server
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-ecsd ./ecsd
+
+build-docker:
+	# if ths is linux
+	if [ "$(shell uname -s)" = "Linux" ]; then
+		make
+		docker build -t ecsd -f ecsd/Dockerfile .
+	else
+		echo "This build process is designed for Linux systems only."
+	fi
 
 .PHONY: all proto build-debug build-release clean build-linux-debug build-linux-release prepare

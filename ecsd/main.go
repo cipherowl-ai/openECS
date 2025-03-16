@@ -175,6 +175,8 @@ func main() {
 		*port, *grpcPort, ratelimit, burst, environment)
 
 	// Configure PGP handler if keys are provided
+	// TODO refine this to use the helper functions in the securedata package
+
 	var options []store.Option
 	if privateKeyFile != "" || publicKeyFile != "" {
 		pgpOptions := []securedata.Option{}
@@ -203,13 +205,9 @@ func main() {
 	}
 
 	// Then load the filter from file
-	lasterror = filter.LoadFromFile(*filename)
-	if lasterror != nil {
-		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
-	}
 
-	// Record initial load time
-	lastFilterLoadTime = time.Now().UTC()
+	// Record initial load time - to be 1970-01-01 00:00:00 UTC
+	lastFilterLoadTime = time.Unix(0, 0).UTC() // 1970-01-01 00:00:00 UTC
 
 	// Create a file watcher notifier.
 	notifier, err := reload.NewFileWatcherNotifier(*filename, 2*time.Second)
@@ -446,6 +444,9 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// test if BLOOMFILTER_PATH is set
+	// if it is set, download the file to the path
+	// if it is not set, create a temporary file
 	// Create temporary file
 	tempFile, err := os.CreateTemp("", "bloomfilter-*.gob")
 	if err != nil {
@@ -466,7 +467,7 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 	// Load the new filter data directly into the existing filter
 	err = filter.LoadFromFile(tempFilePath)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to load new Bloom filter: %v"}`, err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf(`{"error": "Failed to reload new Bloom filter: %v"}`, err), http.StatusInternalServerError)
 		return
 	}
 
@@ -545,6 +546,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 			"message": "Error details",
 			"filter":  "Bloom filter stats summary",
 		}
+	}
+
+	// if lastFilterLoadTime is more than 24 hour, call updateHandler
+	if time.Since(lastFilterLoadTime) > 24*time.Hour {
+		updateHandler(w, r)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
