@@ -1,24 +1,33 @@
-FROM golang:1.21-alpine AS builder
-
-WORKDIR /app
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-
-RUN CGO_ENABLED=0 GOOS=linux go build -o ecsd ./cmd/ecsd
-
 FROM alpine:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/ecsd .
-# Copy the test bloom filter for testing
-COPY --from=builder /app/test_bloomfilter.gob .
+# Copy the pre-built binary
+COPY target/release/pa_unix-ecsd /app/ecsd
 
-# Default port
-EXPOSE 8080
+# Copy the default bloomfilter.gob
+COPY bloomfilter.gob /app/bloomfilter.gob
 
-ENTRYPOINT ["./ecsd"]
-CMD ["-f", "test_bloomfilter.gob"] 
+# Copy the key files
+COPY ecsd/keypair/privkey_sample.asc /app/keys/privkey.asc
+COPY ecsd/keypair/pubkey_sample.asc /app/keys/pubkey.asc
+
+# Create a data directory for the bloomfilter
+RUN mkdir -p /app/.co_data
+
+# Make the binary executable
+RUN chmod +x /app/ecsd
+
+# Default ports
+EXPOSE 8080 9090
+
+# Set environment variables
+ENV CO_CLIENT_ID=""
+ENV CO_CLIENT_SECRET=""
+ENV CO_BASE_URL="svc.cipherowl.ai"
+ENV CO_ENV="prod"
+ENV KEY_PASSPHRASE=""
+
+# Default command
+ENTRYPOINT ["/app/ecsd"]
+CMD ["-f", "/app/bloomfilter.gob", "-private-key-file", "/app/keys/privkey.asc", "-public-key-file", "/app/keys/pubkey.asc"] 

@@ -213,7 +213,7 @@ grpcurl -plaintext localhost:9090 list proto.ECSd
 ```
 
 Output:
-```
+```bash
 proto.ECSd.BatchCheckAddresses
 proto.ECSd.CheckAddress
 proto.ECSd.InspectFilter
