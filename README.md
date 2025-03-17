@@ -198,6 +198,30 @@ BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op      
 BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
 BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
 ```
+#### Python client
+```bash
+python bench.py
+Starting load test for http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE
+Duration: 10 seconds, Concurrency: 10
+--------------------------------------------------
+Requests: 52522, Rate: 5504.99 req/sec
+--------------------------------------------------
+Test Results:
+Total requests: 55068
+Test duration: 10.00 seconds
+Requests per second: 5506.39
+
+Latency (ms):
+  Min: 0.57
+  Max: 6.06
+  Avg: 1.81
+  Median: 1.80
+  95th percentile: 1.88
+  99th percentile: 1.93
+
+Status Codes:
+  200: 55068 (100.00%)
+```
 
 ## Limitations
 
