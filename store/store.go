@@ -3,6 +3,7 @@ package store
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 
@@ -13,10 +14,11 @@ import (
 
 // BloomStats represents statistics about a Bloom filter
 type BloomStats struct {
-	K                 uint   `json:"k"`                  // Number of hash functions
-	M                 uint   `json:"m"`                  // Bit array size
-	N                 uint32 `json:"n"`                  // Number of elements added
-	EstimatedCapacity uint   `json:"estimated_capacity"` // Estimated element capacity
+	K                 uint    `json:"k"`                   // Number of hash functions
+	M                 uint    `json:"m"`                   // Bit array size
+	N                 uint32  `json:"n"`                   // Number of elements added
+	EstimatedCapacity uint    `json:"estimated_capacity"`  // Estimated element capacity
+	FalsePositiveRate float64 `json:"false_positive_rate"` // Estimated false positive rate
 }
 
 type BloomFilterStore struct {
@@ -48,7 +50,7 @@ func WithSecureDataHandler(handler securedata.SecureDataHandler) Option {
 func NewBloomFilterStore(addressHandler address.AddressHandler, opts ...Option) (*BloomFilterStore, error) {
 	bf := &BloomFilterStore{
 		addressHandler: addressHandler,
-		filter:         bloom.NewWithEstimates(10000, 0.0000001), // Default values
+		filter:         bloom.NewWithEstimates(10000, 0.0000001), // Default values, will be overridden by options if provided
 	}
 
 	for _, opt := range opts {
@@ -125,7 +127,8 @@ func (bf *BloomFilterStore) PrintStats() {
 	fmt.Printf("  🔑 K (number of hash functions): %d\n", bf.filter.K())
 	fmt.Printf("  📏 M (bit array size): %d\n", bf.filter.Cap())
 	fmt.Printf("  🔢 N (number of elements added): %d\n", bf.filter.ApproximatedSize())
-	fmt.Printf("  💪 Estimated elements capacity: %d\n", bf.filter.Cap()/bf.filter.K())
+	fmt.Printf("  💪 Est. elements capacity: %d\n", bf.filter.Cap()/bf.filter.K())
+	fmt.Printf("  🔄 Est. False positive rate: %f\n", bf.GetStats().FalsePositiveRate)
 }
 
 // GetStats returns the current statistics of the Bloom filter
@@ -133,11 +136,24 @@ func (bf *BloomFilterStore) GetStats() BloomStats {
 	bf.mu.RLock()
 	defer bf.mu.RUnlock()
 
+	// Calculate false positive rate using the formula: (1 - e^(-k*n/m))^k
+	// where k is the number of hash functions, n is the number of elements, and m is the bit array size
+	k := float64(bf.filter.K())
+	m := float64(bf.filter.Cap())
+	n := float64(bf.filter.ApproximatedSize())
+
+	// Avoid division by zero
+	var falsePositiveRate float64
+	if m > 0 {
+		falsePositiveRate = math.Pow(1-math.Exp(-k*n/m), k)
+	}
+
 	return BloomStats{
 		K:                 bf.filter.K(),
 		M:                 bf.filter.Cap(),
 		N:                 bf.filter.ApproximatedSize(),
 		EstimatedCapacity: bf.filter.Cap() / bf.filter.K(),
+		FalsePositiveRate: falsePositiveRate,
 	}
 }
 
@@ -180,6 +196,12 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 
 	bf.mu.Lock()
 	defer bf.mu.Unlock()
+
+	//simple sanity check
+	if filter.ApproximatedSize() == 0 {
+		return fmt.Errorf("❌ failed to parse Bloom filter: %w", err)
+	}
+
 	bf.filter = &filter
 
 	return nil
