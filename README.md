@@ -27,6 +27,7 @@ The `.gob` file can be easily shared across data pipelines. Adding key-pair encr
 
 ```bash
 git clone https://github.com/your-username/addressdb.git
+git lfs pull
 cd addressdb
 go mod tidy
 ```
