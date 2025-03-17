@@ -8,120 +8,145 @@ import statistics
 from datetime import datetime
 import sys
 from collections import defaultdict
+import random
 
 class LoadTester:
-    def __init__(self, url, duration, concurrency, headers=None):
-        self.url = url
+    def __init__(self, addresses, duration, concurrency, headers):
+        self.addresses = addresses
         self.duration = duration
         self.concurrency = concurrency
-        self.headers = headers or {}
-        self.results = []
-        self.status_counts = defaultdict(int)
-        self.request_count = 0
+        self.headers = headers
         self.start_time = None
-        self.end_time = None
+        self.total_requests = 0
+        self.successful_requests = 0
+        self.failed_requests = 0
+        self.total_time = 0
+        self.latencies = []
+        self.status_counts = defaultdict(int)
+        self.last_progress_time = 0
+        self.progress_interval = 0.5  # Update progress every 0.5 seconds
 
     async def make_request(self, session):
-        start = time.time()
+        # Randomly select an address from the list
+        address = random.choice(self.addresses)
+        url = f"http://localhost:8080/check?address={address}"
+        
+        start_time = time.time()
         try:
-            async with session.get(self.url, headers=self.headers) as response:
-                await response.text()
-                end = time.time()
-                latency = (end - start) * 1000  # Convert to ms
-                self.results.append(latency)
+            async with session.get(url, headers=self.headers) as response:
+                if response.status == 200:
+                    self.successful_requests += 1
+                else:
+                    self.failed_requests += 1
                 self.status_counts[response.status] += 1
-                return True
         except Exception as e:
-            end = time.time()
-            latency = (end - start) * 1000  # Convert to ms
-            self.results.append(latency)
+            self.failed_requests += 1
             self.status_counts['error'] += 1
-            return False
+            print(f"\nError: {e}")
+        finally:
+            latency = (time.time() - start_time) * 1000  # Convert to ms
+            self.latencies.append(latency)
+            self.total_time += latency / 1000  # Convert back to seconds
+            self.total_requests += 1
+
+    async def show_progress(self):
+        while time.time() - self.start_time < self.duration:
+            current_time = time.time()
+            if current_time - self.last_progress_time >= self.progress_interval:
+                elapsed = current_time - self.start_time
+                if elapsed > 0:
+                    rps = self.total_requests / elapsed
+                    success_rate = (self.successful_requests / self.total_requests * 100) if self.total_requests > 0 else 0
+                    sys.stdout.write(f"\rProgress: {elapsed:.1f}/{self.duration}s | "
+                                   f"Requests: {self.total_requests} | "
+                                   f"Rate: {rps:.1f} req/s | "
+                                   f"Success: {success_rate:.1f}% | "
+                                   f"Errors: {self.failed_requests}")
+                    sys.stdout.flush()
+                self.last_progress_time = current_time
+            await asyncio.sleep(0.1)
 
     async def worker(self, session):
-        while time.time() < self.end_time:
+        while time.time() - self.start_time < self.duration:
             await self.make_request(session)
-            self.request_count += 1
 
     async def run(self):
-        self.start_time = time.time()
-        self.end_time = self.start_time + self.duration
-        
-        print(f"Starting load test for {self.url}")
+        print(f"\nStarting load test with {len(self.addresses)} addresses")
         print(f"Duration: {self.duration} seconds, Concurrency: {self.concurrency}")
-        print("-" * 50)
+        print("-" * 80)
         
-        connector = aiohttp.TCPConnector(limit=self.concurrency)
-        async with aiohttp.ClientSession(connector=connector) as session:
-            workers = [self.worker(session) for _ in range(self.concurrency)]
-            
-            # Print progress while test is running
+        self.start_time = time.time()
+        async with aiohttp.ClientSession() as session:
+            # Start progress display
             progress_task = asyncio.create_task(self.show_progress())
             
-            # Start all workers
-            await asyncio.gather(*workers)
+            # Start workers
+            tasks = [self.worker(session) for _ in range(self.concurrency)]
+            await asyncio.gather(*tasks)
             
             # Cancel progress display
             progress_task.cancel()
-            
-        # Calculate and display final results
-        self.print_results()
+            print("\n" + "-" * 80)
 
-    async def show_progress(self):
-        try:
-            while True:
-                elapsed = time.time() - self.start_time
-                if elapsed > 0:
-                    rate = self.request_count / elapsed
-                    sys.stdout.write(f"\rRequests: {self.request_count}, Rate: {rate:.2f} req/sec")
-                    sys.stdout.flush()
-                await asyncio.sleep(0.5)
-        except asyncio.CancelledError:
-            pass
+        # Calculate statistics
+        total_time = time.time() - self.start_time
+        rps = self.total_requests / total_time
+        success_rate = (self.successful_requests / self.total_requests * 100) if self.total_requests > 0 else 0
 
-    def print_results(self):
-        actual_duration = time.time() - self.start_time
+        # Print detailed results
+        print("\nTest Results:")
+        print("-" * 80)
+        print(f"Duration: {total_time:.2f} seconds")
+        print(f"Total Requests: {self.total_requests:,}")
+        print(f"Successful Requests: {self.successful_requests:,} ({success_rate:.1f}%)")
+        print(f"Failed Requests: {self.failed_requests:,}")
+        print(f"Requests per Second: {rps:.1f}")
         
-        print("\n" + "-" * 50)
-        print("Test Results:")
-        print(f"Total requests: {self.request_count}")
-        print(f"Test duration: {actual_duration:.2f} seconds")
-        print(f"Requests per second: {self.request_count / actual_duration:.2f}")
-        
-        if self.results:
-            print("\nLatency (ms):")
-            print(f"  Min: {min(self.results):.2f}")
-            print(f"  Max: {max(self.results):.2f}")
-            print(f"  Avg: {statistics.mean(self.results):.2f}")
-            print(f"  Median: {statistics.median(self.results):.2f}")
+        if self.latencies:
+            print("\nLatency Statistics (ms):")
+            print(f"  Min: {min(self.latencies):.2f}")
+            print(f"  Max: {max(self.latencies):.2f}")
+            print(f"  Avg: {statistics.mean(self.latencies):.2f}")
+            print(f"  Median: {statistics.median(self.latencies):.2f}")
             
             # Calculate percentiles
-            sorted_latencies = sorted(self.results)
+            sorted_latencies = sorted(self.latencies)
             p95_idx = int(len(sorted_latencies) * 0.95)
             p99_idx = int(len(sorted_latencies) * 0.99)
-            
             print(f"  95th percentile: {sorted_latencies[p95_idx]:.2f}")
             print(f"  99th percentile: {sorted_latencies[p99_idx]:.2f}")
         
         print("\nStatus Codes:")
         for status, count in sorted(self.status_counts.items()):
-            print(f"  {status}: {count} ({count/self.request_count*100:.2f}%)")
-
+            percentage = (count / self.total_requests * 100) if self.total_requests > 0 else 0
+            print(f"  {status}: {count:,} ({percentage:.1f}%)")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HTTP Load Testing Tool")
-    parser.add_argument("--url", default="http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE", 
-                        help="URL to test")
+    parser.add_argument("--file", "-f", required=True,
+                        help="File containing addresses (one per line)")
     parser.add_argument("--duration", type=int, default=10, 
                         help="Test duration in seconds")
     parser.add_argument("--concurrency", type=int, default=10, 
                         help="Number of concurrent connections")
     args = parser.parse_args()
     
+    # Read addresses from file
+    try:
+        with open(args.file, 'r') as f:
+            addresses = [line.strip() for line in f if line.strip()]
+        if not addresses:
+            print(f"Error: No addresses found in {args.file}")
+            exit(1)
+        print(f"Loaded {len(addresses):,} addresses from {args.file}")
+    except FileNotFoundError:
+        print(f"Error: File {args.file} not found")
+        exit(1)
+    
     # Custom headers
     headers = {
-        "__llm_bot_caller__": "1"
+        "__llm_bot_caller__": "0"
     }
     
-    tester = LoadTester(args.url, args.duration, args.concurrency, headers)
+    tester = LoadTester(addresses, args.duration, args.concurrency, headers)
     asyncio.run(tester.run())

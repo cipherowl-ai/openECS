@@ -198,29 +198,35 @@ BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op      
 BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
 BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
 ```
-#### Python client
+#### Python client on a 32 core machine (local testing)
 ```bash
-python bench.py
-Starting load test for http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE
-Duration: 10 seconds, Concurrency: 10
---------------------------------------------------
-Requests: 52522, Rate: 5504.99 req/sec
---------------------------------------------------
-Test Results:
-Total requests: 55068
-Test duration: 10.00 seconds
-Requests per second: 5506.39
+> python bench.py -f addresses.txt --duration 30 --concurrency 32
+Loaded 1,000 addresses from addresses.txt
 
-Latency (ms):
-  Min: 0.57
-  Max: 6.06
+Starting load test with 1000 addresses
+Duration: 30 seconds, Concurrency: 10
+--------------------------------------------------------------------------------
+Progress: 29.6/30s | Requests: 163252 | Rate: 5509.2 req/s | Success: 100.0% | Errors: 0
+--------------------------------------------------------------------------------
+
+Test Results:
+--------------------------------------------------------------------------------
+Duration: 30.00 seconds
+Total Requests: 165,282
+Successful Requests: 165,282 (100.0%)
+Failed Requests: 0
+Requests per Second: 5509.3
+
+Latency Statistics (ms):
+  Min: 0.55
+  Max: 7.21
   Avg: 1.81
-  Median: 1.80
-  95th percentile: 1.88
-  99th percentile: 1.93
+  Median: 1.81
+  95th percentile: 1.87
+  99th percentile: 1.91
 
 Status Codes:
-  200: 55068 (100.00%)
+  200: 165,282 (100.0%)
 ```
 
 ## Limitations
