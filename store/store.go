@@ -3,12 +3,21 @@ package store
 import (
 	"bufio"
 	"fmt"
+	"os"
+	"sync"
+
 	"github.com/bits-and-blooms/bloom/v3"
 	"github.com/cipherowl-ai/addressdb/address"
 	"github.com/cipherowl-ai/addressdb/securedata"
-	"os"
-	"sync"
 )
+
+// BloomStats represents statistics about a Bloom filter
+type BloomStats struct {
+	K                 uint   `json:"k"`                  // Number of hash functions
+	M                 uint   `json:"m"`                  // Bit array size
+	N                 uint32 `json:"n"`                  // Number of elements added
+	EstimatedCapacity uint   `json:"estimated_capacity"` // Estimated element capacity
+}
 
 type BloomFilterStore struct {
 	filter            *bloom.BloomFilter
@@ -23,6 +32,7 @@ type Option func(*BloomFilterStore)
 // WithCapacity sets the capacity for the Bloom filter.
 func WithEstimates(capacity uint, falsePositiveRate float64) Option {
 	return func(bf *BloomFilterStore) {
+		fmt.Printf("⚙️ Applying Bloom filter estimates: capacity=%d, falsePositiveRate=%f\n", capacity, falsePositiveRate)
 		bf.filter = bloom.NewWithEstimates(capacity, falsePositiveRate)
 	}
 }
@@ -106,6 +116,31 @@ func (bf *BloomFilterStore) CheckAddress(address string) (bool, error) {
 	return bf.filter.Test(addressBytes), nil
 }
 
+// PrintStats prints the current statistics of the Bloom filter
+func (bf *BloomFilterStore) PrintStats() {
+	bf.mu.RLock()
+	defer bf.mu.RUnlock()
+
+	fmt.Printf("📊 Bloom Filter Statistics:\n")
+	fmt.Printf("  🔑 K (number of hash functions): %d\n", bf.filter.K())
+	fmt.Printf("  📏 M (bit array size): %d\n", bf.filter.Cap())
+	fmt.Printf("  🔢 N (number of elements added): %d\n", bf.filter.ApproximatedSize())
+	fmt.Printf("  💪 Estimated elements capacity: %d\n", bf.filter.Cap()/bf.filter.K())
+}
+
+// GetStats returns the current statistics of the Bloom filter
+func (bf *BloomFilterStore) GetStats() BloomStats {
+	bf.mu.RLock()
+	defer bf.mu.RUnlock()
+
+	return BloomStats{
+		K:                 bf.filter.K(),
+		M:                 bf.filter.Cap(),
+		N:                 bf.filter.ApproximatedSize(),
+		EstimatedCapacity: bf.filter.Cap() / bf.filter.K(),
+	}
+}
+
 func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 	if filePath == "" {
 		return fmt.Errorf("no file path specified for loading")
@@ -133,9 +168,9 @@ func (bf *BloomFilterStore) LoadFromFile(filePath string) error {
 		r := bufio.NewReader(f)
 
 		if ok, err := securedata.IsRawEncrypted(r); err != nil {
-			return fmt.Errorf("failed to check if file is encrypted: %w", err)
+			return fmt.Errorf("❌ failed to check if file is encrypted: %w", err)
 		} else if ok {
-			return fmt.Errorf("file is encrypted but no SecureDataHandler provided")
+			return fmt.Errorf("🔐 file is encrypted but no SecureDataHandler provided")
 		}
 
 		if _, err := filter.ReadFrom(r); err != nil {
@@ -170,7 +205,12 @@ func (bf *BloomFilterStore) SaveToFile(filePath string) error {
 		if _, err := bf.filter.WriteTo(w); err != nil {
 			return err
 		}
+		// print debug message encrypted
+		fmt.Printf("🔒 Encrypted\n")
 		return w.Close()
+	} else {
+		// print debug message not encrypted
+		fmt.Printf("📄 Not encrypted\n")
 	}
 
 	w := bufio.NewWriter(f)

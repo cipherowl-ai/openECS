@@ -3,11 +3,12 @@ package securedata
 import (
 	"bufio"
 	"bytes"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ProtonMail/gopenpgp/v3/crypto"
 )
@@ -40,7 +41,7 @@ func TestGpgKeys(t *testing.T) {
 	pubkeyPath := "testdata/pubkey.asc"
 	privkeyPath := "testdata/privkey.asc"
 
-	handler, err := NewPGPSecureHandler(WithPublicKeyPath(pubkeyPath), WithPrivateKeyPath(privkeyPath, "password123"))
+	handler, err := NewPGPSecureHandler(WithPublicKeyPath(pubkeyPath), WithPrivateKeyPath(privkeyPath, "123456"))
 	require.NoError(t, err)
 	require.NotNil(t, handler)
 
@@ -145,9 +146,24 @@ func TestIsRawEncrypted(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, handler)
 
+	// Create a small sample of encrypted data
 	var buf bytes.Buffer
 	writer := createWriter(t, handler, &buf)
 	writeData(t, writer, "test data")
+	encryptedData := buf.Bytes()
+
+	// Debug info to help understand the data format
+	t.Logf("Encrypted data length: %d", len(encryptedData))
+	if len(encryptedData) > 0 {
+		// Print the first few bytes for debugging
+		numBytes := min(30, len(encryptedData))
+		t.Logf("First %d bytes of encrypted data:", numBytes)
+		for i := 0; i < numBytes; i++ {
+			t.Logf("  Byte %d: %d (0x%02x) - Binary: %08b - Char: %q",
+				i, encryptedData[i], encryptedData[i], encryptedData[i],
+				encryptedData[i])
+		}
+	}
 
 	tests := []struct {
 		name string
@@ -155,15 +171,22 @@ func TestIsRawEncrypted(t *testing.T) {
 		want bool
 	}{
 		{"empty data", []byte{}, false},
-		{"encrypted data", buf.Bytes(), true},
+		{"encrypted data", encryptedData, true},
 		{"unencrypted data", []byte("test data"), false},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := bufio.NewReader(bytes.NewReader(tt.data))
 			ok, err := IsRawEncrypted(reader)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, ok)
+			if tt.want != ok {
+				t.Logf("Expected IsRawEncrypted to return %v for %s, got %v", tt.want, tt.name, ok)
+				if len(tt.data) > 0 {
+					t.Logf("Data first byte: 0x%02x", tt.data[0])
+				}
+			}
+			assert.Equal(t, tt.want, ok, "Detection failed for %s", tt.name)
 		})
 	}
 }

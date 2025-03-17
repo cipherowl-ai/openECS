@@ -51,3 +51,4 @@ go.mod
 
 # Exclude .env files to avoid publishing sensitive data
 .env
+*.asc # PGP keys

@@ -18,6 +18,7 @@ func main() {
 	rootCmd.AddCommand(commands.BatchCheckCmd)
 	rootCmd.AddCommand(commands.AddressGenCmd)
 	rootCmd.AddCommand(commands.AddCmd)
+	rootCmd.AddCommand(commands.InspectCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

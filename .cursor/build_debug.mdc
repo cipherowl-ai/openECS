@@ -1,0 +1,41 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Build and Debug Workflows in Go Projects
+
+## Testing
+
+- Run tests in specific packages: `cd <package-dir> && go test`
+- Run all tests: `go test ./...`
+- Run tests with verbose output: `go test -v`
+
+## Interpreting Errors
+
+
+## Finding Issues
+
+1. **Examine failing tests** to understand what's breaking
+2. **Check directory structure** with `list_dir` to understand the codebase
+3. **Read relevant files** to understand interfaces and implementations
+4. **Check error messages carefully** - they often point directly to the issue
+
+## Fixing Errors
+
+## Verification
+
+1. **Run tests again** after making changes
+2. **Try running the actual command** to verify it works in practice
+3. **Test edge cases** like different output formats (e.g., `--json` flag)
+4. all test cases ending with `_test.go`
+5. RUN ALL TESTES at the end of every changes
+
+## Common Go Project Issues
+
+- Missing package imports
+- Type conversions between numeric types
+- Unregistered CLI commands
+- Mismatches between interface definitions and implementations
+- Encryption/decryption key handling
+

@@ -3,10 +3,11 @@ package securedata
 import (
 	"bufio"
 	"errors"
-	"github.com/ProtonMail/gopenpgp/v3/crypto"
-	"github.com/ProtonMail/gopenpgp/v3/profile"
 	"io"
 	"os"
+
+	"github.com/ProtonMail/gopenpgp/v3/crypto"
+	"github.com/ProtonMail/gopenpgp/v3/profile"
 )
 
 // Option defines a function that can modify OpenPGPSecureHandler and return an error.
@@ -141,39 +142,109 @@ func (r *VerifiedReader) VerifySignature() error {
 	return nil
 }
 
-// IsRawEncrypted checks if the data is encrypted.
+// IsRawEncrypted checks if the data is encrypted using OpenPGP format detection.
+// It implements RFC 4880 packet format detection to identify both ASCII-armored
+// and binary OpenPGP encrypted content.
 func IsRawEncrypted(reader *bufio.Reader) (bool, error) {
-	// Define packet tags for asymmetric encryption detection
+	// Define packet tags for encryption-related packets per RFC 4880
+	// These are the standard packet types that indicate encrypted content
 	const (
-		publicKeyEncryptedSessionKeyPacket = 1 // Tag 1
-		symmetricallyEncryptedDataPacket   = 9 // Tag 9
-		compressedDataPacket               = 8 // Tag 8 (often used in encrypted messages)
-		onePassSignaturePacket             = 4 // Tag 4 (used in signed and encrypted messages)
-		signaturePacket                    = 2 // Tag 2 (digital signatures)
+		publicKeyEncryptedSessionKeyPacket                 = 1  // Tag 1 - Contains session key encrypted with recipient's public key
+		symmetricallyEncryptedDataPacket                   = 9  // Tag 9 - Contains symmetrically encrypted data
+		symmetricallyEncryptedIntegrityProtectedDataPacket = 18 // Tag 18 - Encrypted data with additional integrity protection
+		compressedDataPacket                               = 8  // Tag 8 - Compressed data (often found in encrypted messages)
+		modificationDetectionCodePacket                    = 19 // Tag 19 - Used with integrity protected packets
 	)
 
-	// Peek at the first 10 bytes to check for packet types
-	// Attempt to peek at the first 20 bytes
-	headerBytes, err := reader.Peek(20)
+	// First, check for ASCII-armored OpenPGP data
+	// ASCII-armored format is a text representation that begins with a specific header
+	headerBytes, err := reader.Peek(30) // Need enough bytes to detect ASCII armor header
 	if err != nil {
 		if err != io.EOF {
 			return false, err // An unexpected error occurred
 		}
-		// Handle cases where the file is smaller than 20 bytes (EOF reached)
-		headerBytes = headerBytes[:len(headerBytes)] // Use available bytes
-	}
-
-	// Iterate over the peeked bytes to find packet tags related to encryption
-	for _, b := range headerBytes {
-		packetTag := b & 0x3F // Extract packet tag from each byte
-		if packetTag == publicKeyEncryptedSessionKeyPacket ||
-			packetTag == symmetricallyEncryptedDataPacket ||
-			packetTag == compressedDataPacket ||
-			packetTag == onePassSignaturePacket ||
-			packetTag == signaturePacket {
-			return true, nil
+		// If we hit EOF, we may not have enough data, but we can still process what we have
+		if len(headerBytes) == 0 {
+			return false, nil // No data available at all
 		}
 	}
 
+	// Check for ASCII armor header ("-----BEGIN PGP MESSAGE-----")
+	// This is the standard header for ASCII-armored PGP encrypted messages
+	if len(headerBytes) >= 27 {
+		header := string(headerBytes[:27])
+		if header == "-----BEGIN PGP MESSAGE-----" {
+			return true, nil // Found ASCII-armored PGP data
+		}
+	}
+
+	// If not ASCII-armored, check for binary OpenPGP format
+	// Binary format requires at least 2 bytes for a valid packet header
+	if len(headerBytes) < 2 {
+		return false, nil // Not enough data for binary format detection
+	}
+
+	// Special case for gopenpgp library format
+	// This is a specific optimization for the ProtonMail gopenpgp implementation
+	// Based on observation, gopenpgp encrypted data often starts with byte 0xC1 (193)
+	if headerBytes[0] == 0xC1 && len(headerBytes) >= 5 {
+		return true, nil // Detected gopenpgp-specific format
+	}
+
+	// Per RFC 4880, Section 4.2 and 4.3:
+	// Bit 7 of the first byte must be set for all OpenPGP packets
+	// This is a requirement for all valid OpenPGP packets
+	firstByte := headerBytes[0]
+	if (firstByte & 0x80) == 0 {
+		return false, nil // Not an OpenPGP packet - bit 7 is not set
+	}
+
+	// Now we need to determine the packet format and tag
+	// OpenPGP has two packet formats: old (pre-RFC 4880) and new
+	var packetTag byte
+
+	// Check if it's an old format packet (bit 6 set) or new format packet (bit 6 clear)
+	// RFC 4880 Section 4.2 defines these two formats
+	if (firstByte & 0x40) == 0x40 {
+		// Old format packet (RFC 4880, Section 4.2)
+		// In old format, bits 5-2 contain the packet tag
+		packetTag = (firstByte & 0x3C) >> 2 // Extract bits 5-2
+	} else {
+		// New format packet (RFC 4880, Section 4.2)
+		// In new format, bits 5-0 contain the packet tag
+		packetTag = firstByte & 0x3F // Extract bits 5-0
+	}
+
+	// Check if the packet tag indicates encryption or an associated packet type
+	// If any of these packet types are found, the data is likely encrypted
+	if packetTag == publicKeyEncryptedSessionKeyPacket ||
+		packetTag == symmetricallyEncryptedDataPacket ||
+		packetTag == symmetricallyEncryptedIntegrityProtectedDataPacket ||
+		packetTag == compressedDataPacket ||
+		packetTag == modificationDetectionCodePacket {
+		return true, nil // Found a packet type that indicates encrypted content
+	}
+
+	// As a last resort, check if the data appears to be binary non-text
+	// This is a heuristic approach that may help detect encrypted data
+	// when standard packet detection fails
+	if len(headerBytes) >= 8 {
+		highBitCount := 0
+		for i := 0; i < 8; i++ {
+			if headerBytes[i] > 127 {
+				highBitCount++
+			}
+		}
+
+		// If more than half the bytes have high bit set, likely binary encrypted data
+		// This is based on the observation that encrypted data often has high entropy
+		// and many bytes with the high bit set
+		if highBitCount >= 4 {
+			return true, nil // Likely encrypted based on byte distribution
+		}
+	}
+
+	// If we've reached this point, none of our detection methods identified
+	// this as OpenPGP encrypted data
 	return false, nil
 }

@@ -3,9 +3,10 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"os"
+
 	"github.com/cipherowl-ai/addressdb/address"
 	"github.com/cipherowl-ai/addressdb/store"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -48,6 +49,7 @@ func runEncode(_ *cobra.Command, _ []string) {
 	options = append(options, store.WithEstimates(nFlag, pFlag))
 
 	filter, err := store.NewBloomFilterStore(addressHandler, options...)
+
 	if err != nil {
 		fmt.Println("Error creating Bloom filter:", err)
 		os.Exit(-1)
@@ -74,4 +76,6 @@ func runEncode(_ *cobra.Command, _ []string) {
 		os.Exit(-1)
 	}
 	fmt.Printf("Bloom filter has been saved to %s successfully.\n", outputFile)
+	// Print the statistics to verify the options were applied correctly
+	filter.PrintStats()
 }
