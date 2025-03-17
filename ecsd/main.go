@@ -134,16 +134,7 @@ func main() {
 
 	// First create an empty filter
 	var err error
-	filter, err = store.NewBloomFilterStore(addressHandler, options...)
-	if err != nil {
-		logger.Fatalf("Failed to create empty Bloom filter: %v", err)
-	}
-
-	// Then load the filter from file
-	lasterror = filter.LoadFromFile(*filename)
-	if lasterror != nil {
-		logger.Fatalf("Failed to load Bloom filter: %v", lasterror)
-	}
+	filter, err = store.NewBloomFilterStoreFromFile(*filename, addressHandler, options...)
 
 	// Record initial load time
 	lastFilterLoadTime = time.Now().UTC()

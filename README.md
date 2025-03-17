@@ -119,12 +119,12 @@ Creates a `bloomfilter.gob` file containing the Bloom filter.
 Interactive mode:
 
 ```bash
-go run cmd/cli/main.go check -f bloomfilter.gob --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+go run cmd/cli/main.go check -f bloomfilter.gob 
 ```
 You can also specify the environment (default is prod):
 
 ```bash
-go run cmd/cli/main.go check -f bloomfilter.gob --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --env dev
+go run cmd/cli/main.go check -f bloomfilter.gob  
 ```
 
 Batch mode:

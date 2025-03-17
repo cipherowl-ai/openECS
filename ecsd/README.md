@@ -34,27 +34,27 @@ Environment variables can be set in a `.env` file in the service root directory:
 ### Build
 
 ```bash
-cd cmd/ecsd
-go build -o ecsd
+make # target/*/pa-ecsd
 ```
 
 ### Run
 
 ```bash
 # Run with default options
-./ecsd
+./target/release/pa-ecsd
 
 # Specify a different Bloom filter file
-./ecsd -f /path/to/bloomfilter.gob
+./target/release/pa-ecsd -f /path/to/bloomfilter.gob
 
 # Change the port
-./ecsd -p 8081
+./target/release/pa-ecsd -p 8081
 
 # Set rate limits
-./ecsd -r 50 -b 10
+./target/release/pa-ecsd -r 50 -b 10
 
 # Use encryption keys
-./ecsd -private-key-file /path/to/private.key -public-key-file /path/to/public.key
+export KEY_PASSPHRASE=123456 # the passphrase for the private key, alternatively can `source .env`
+./target/release/pa-ecsd -f bloomfilter.gob -private-key-file securedata/testdata/privkey.asc -public-key-file securedata/testdata/pubkey.asc
 ```
 
 
