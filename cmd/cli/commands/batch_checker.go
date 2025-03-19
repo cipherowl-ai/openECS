@@ -18,9 +18,7 @@ var BatchCheckCmd = &cobra.Command{
 
 func init() {
 	BatchCheckCmd.Flags().StringVarP(&filename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
-	BatchCheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
 	BatchCheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
-	BatchCheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
 	BatchCheckCmd.Flags().StringVar(&env, "env", "prod", "Environment (optional)")
 	BatchCheckCmd.Flags().StringVar(&clientID, "client-id", "", "OAuth client ID (required)")
 	BatchCheckCmd.Flags().StringVar(&clientSecret, "client-secret", "", "OAuth client secret (required)")
