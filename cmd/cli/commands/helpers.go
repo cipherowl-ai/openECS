@@ -27,14 +27,11 @@ type tokenResponse struct {
 func configurePGPHandler() ([]store.Option, error) {
 	var options []store.Option
 	pgpOptions := []securedata.Option{}
-	// If no private key or public key is provided, return nil
-	if privateKeyFile == "" && publicKeyFile == "" {
+	// If no public key is provided, return nil
+	if publicKeyFile == "" {
 		return options, nil
 	}
 
-	if privateKeyFile != "" {
-		pgpOptions = append(pgpOptions, securedata.WithPrivateKeyPath(privateKeyFile, privateKeyPassphrase))
-	}
 	if publicKeyFile != "" {
 		pgpOptions = append(pgpOptions, securedata.WithPublicKeyPath(publicKeyFile))
 	}
