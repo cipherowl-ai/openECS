@@ -69,27 +69,27 @@ export CO_CLIENT_SECRET=your_client_secret
 ### Build
 
 ```bash
-go build -o ecsd cmd/ecsd/main.go
+make # target/*/pa-ecsd
 ```
 
 ### Run
 
 ```bash
 # Run with default options
-./ecsd
+./target/release/pa-ecsd
 
 # Specify a different Bloom filter file
-./ecsd -f /path/to/bloomfilter.gob
+./target/release/pa-ecsd -f /path/to/bloomfilter.gob
 
 # Change the port
-./ecsd -p 8081
+./target/release/pa-ecsd -p 8081
 
 # Set rate limits
-./ecsd -r 50 -b 10
+./target/release/pa-ecsd -r 50 -b 10
 
 # Use environment variables with GRPC port 9090 and HTTP port 8080, plus encryption keys
-export KEY_PASSPHRASE=123456                    
-./ecsd -f bloomfilter.gob -p 8080 -gp 9090 -r 2000 -b 5000 -private-key-file securedata/testdata/privkey.asc -public-key-file securedata/testdata/pubkey.asc
+export KEY_PASSPHRASE=123456 # the passphrase for the private key, alternatively can put into the `.env`                   
+./target/release/pa-ecsd -f bloomfilter.gob -p 8080 -gp 9090 -r 2000 -b 5000 --decrypt-key securedata/testdata/privkey.asc --signing-key securedata/testdata/pubkey.asc
 ```
 
 
