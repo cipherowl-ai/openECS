@@ -14,11 +14,15 @@ RELEASE_FLAGS=-ldflags="-s -w" -trimpath
 PROTOC=protoc
 PROTO_DIR=proto
 
+setup:
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+
 # Build targets
 all: proto fmt clean build-debug build-release
 
 # Generate protobuf code
-proto:
+proto: setup
 	@echo "Generating Go code from protobuf definitions..."
 	$(PROTOC) --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
