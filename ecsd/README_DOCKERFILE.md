@@ -13,8 +13,9 @@ docker build -t ecsd -f ecsd/Dockerfile .
 
 ### Basic Run Command
 ```bash
-docker run -e CO_CLIENT_SECRET=your_secret -e KEY_PASSPHRASE=your_passphrase -p 18080:8080 -p 19090:9090 --rm ecsd
+docker run --env-file docker.env -p 8080:8080 -p 9090:9090 -v $(pwd)/ecsd/keypair/:/app/keys  ecsd:latest
 ```
+
 
 ### Environment Variables
 
@@ -44,9 +45,10 @@ docker volume create ecsd-data
 docker run \
   -e CO_CLIENT_SECRET=your_secret \
   -e KEY_PASSPHRASE=your_passphrase \
-  -p 18080:8080 \
-  -p 19090:9090 \
-  -v ecsd-data:/app/data \
+  -p 8080:8080 \
+  -p 9090:9090 \
+  -v $(pwd)/ecsd/keypair/:/app/keys \
+  -v $(pwd)/ecsd-data:/app/data \
   --rm \
   ecsd
 ```

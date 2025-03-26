@@ -1,34 +1,30 @@
-FROM ubuntu:22.04
+# Builder image
+FROM golang:1.22-alpine3.21 AS builder
+
+# Install required runtime dependencies
+# RUN apk add --no-cache \
+#     ca-certificates \
+#     libc6 \
+#     libssl3 \
+#     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install required runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libc6 \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+COPY . .
 
-# Define ARGs for key file paths with defaults
-ARG PRIVKEY_PATH=ecsd/keypair/privkey_sample.asc
-ARG PUBKEY_PATH=ecsd/keypair/pubkey_sample.asc
-ARG BINARY_PATH=target/release/pa-ecsd
+RUN go build -o ecsd-bin cmd/ecsd/main.go
+
+# Runtime image
+FROM alpine:3.21
+
+WORKDIR /app
 
 # Create necessary directories
 RUN mkdir -p /app/keys /app/data
 
-# Copy the pre-built binary
-COPY ${BINARY_PATH} /app/ecsd-bin
-
-# Make the binary executable
-RUN chmod +x /app/ecsd-bin
-
-# Copy the key files
-COPY ${PRIVKEY_PATH} /app/keys/privkey.asc
-COPY ${PUBKEY_PATH} /app/keys/pubkey.asc
-
-# Create a data directory for the bloomfilter
-RUN mkdir -p /app/.co_data
+# Copy the binary and public key
+COPY --from=builder /app/ecsd-bin /app/ecsd-bin
+COPY --from=builder /app/ecsd/keypair/cipherowl-inc-ecs-signing-prod-public.asc /app/keys/cipherowl-inc-ecs-signing-prod-public.asc
 
 # Default ports
 EXPOSE 8080 9090
@@ -37,10 +33,12 @@ EXPOSE 8080 9090
 ENV PORT=8080 \
     BURST=5 \
     RATELIMIT=20 \
-    BLOOMFILTER_PATH="/app/data/bloomfilter.gob" 
+    BLOOMFILTER_PATH="/app/data/bloomfilter.gob"
 
 # Create a volume for persistent bloom filter storage
 VOLUME /app/data
+
+VOLUME /app/keys
 
 # SECURITY NOTE: Sensitive variables should be passed at runtime, not in the Dockerfile
 # CO_CLIENT_SECRET
@@ -66,18 +64,4 @@ VOLUME /app/data
 # 3. Using environment files:
 #    docker run --env-file=./secure.env your-image-name
 
-# Create a wrapper script to handle environment variables
-COPY <<-"EOF" /app/entrypoint.sh
-#!/bin/sh
-exec /app/ecsd-bin \
-    -p ${PORT} \
-    -b ${BURST} \
-    -r ${RATELIMIT} \
-    -f ${BLOOMFILTER_PATH} \
-    -private-key-file /app/keys/privkey.asc \
-    -public-key-file /app/keys/pubkey.asc
-EOF
-
-RUN chmod +x /app/entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh"] 
+ENTRYPOINT ["/app/ecsd-bin"]

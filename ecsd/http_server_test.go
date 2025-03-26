@@ -1,8 +1,9 @@
-package main
+package ecsd
 
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,12 +11,27 @@ import (
 	"time"
 
 	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/ecsd/config"
 	"github.com/cipherowl-ai/addressdb/store"
-	"golang.org/x/time/rate"
 )
 
-// Setup test filter
-func setupTestFilter(t *testing.T) {
+// MockReloadInfo is a minimal implementation of ReloadInfo for testing
+type MockReloadInfo struct {
+	lastLoadTime time.Time
+}
+
+// GetLastLoadTime returns the last time the filter was loaded
+func (m *MockReloadInfo) LastLoadTime() time.Time {
+	return m.lastLoadTime
+}
+
+// SetLastLoadTime updates the last load time
+func (m *MockReloadInfo) SetLastLoadTime(t time.Time) {
+	m.lastLoadTime = t
+}
+
+// Setup test filter and server
+func setupTestServer(t *testing.T) *HTTPServer {
 	// Create a test bloom filter with known addresses
 	addressHandler := &address.EVMAddressHandler{}
 	testFilter, err := store.NewBloomFilterStore(addressHandler, store.WithEstimates(100000, 0.01))
@@ -46,21 +62,24 @@ func setupTestFilter(t *testing.T) {
 		t.Fatalf("Failed to save test filter: %v", err)
 	}
 
-	// Set global filter for testing
-	filter, err = store.NewBloomFilterStoreFromFile(tempFile.Name(), addressHandler)
-	if err != nil {
-		t.Fatalf("Failed to load test filter: %v", err)
+	loadInfo := &MockReloadInfo{
+		lastLoadTime: time.Now(),
 	}
 
-	// Set testing rate limits
-	ratelimit = 100
-	burst = 50
-	updateLimiter = rate.NewLimiter(rate.Limit(100), 50) // Higher limits for testing
+	// Create HTTP server with test configuration
+	server := NewHTTPServer(testFilter, loadInfo, slog.Default(), &config.ServerConfig{
+		HTTPPort:  8080,
+		GRPCPort:  8081,
+		RateLimit: 10,
+		Burst:     20,
+	})
+
+	return server
 }
 
 // Test check handler
 func TestCheckHandler(t *testing.T) {
-	setupTestFilter(t)
+	server := setupTestServer(t)
 
 	tests := []struct {
 		name           string
@@ -105,10 +124,9 @@ func TestCheckHandler(t *testing.T) {
 
 			// Create response recorder
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(checkHandler)
 
-			// Handle request
-			handler.ServeHTTP(rr, req)
+			// Handle request using server methods
+			server.checkHandler(rr, req)
 
 			// Check status code
 			if status := rr.Code; status != tc.expectedStatus {
@@ -132,7 +150,7 @@ func TestCheckHandler(t *testing.T) {
 
 // Test batch check handler
 func TestBatchCheckHandler(t *testing.T) {
-	setupTestFilter(t)
+	server := setupTestServer(t)
 
 	tests := []struct {
 		name             string
@@ -195,10 +213,9 @@ func TestBatchCheckHandler(t *testing.T) {
 
 			// Create response recorder
 			rr := httptest.NewRecorder()
-			handler := http.HandlerFunc(batchCheckHandler)
 
-			// Handle request
-			handler.ServeHTTP(rr, req)
+			// Handle request using server methods
+			server.batchCheckHandler(rr, req)
 
 			// Check status code
 			if status := rr.Code; status != tc.expectedStatus {
@@ -226,7 +243,7 @@ func TestBatchCheckHandler(t *testing.T) {
 
 // Test inspect handler
 func TestInspectHandler(t *testing.T) {
-	setupTestFilter(t)
+	server := setupTestServer(t)
 
 	// Create request
 	req, err := http.NewRequest("GET", "/inspect", nil)
@@ -236,10 +253,9 @@ func TestInspectHandler(t *testing.T) {
 
 	// Create response recorder
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(inspectHandler)
 
-	// Handle request
-	handler.ServeHTTP(rr, req)
+	// Handle request using server methods
+	server.inspectHandler(rr, req)
 
 	// Check status code
 	if status := rr.Code; status != http.StatusOK {
@@ -263,8 +279,9 @@ func TestInspectHandler(t *testing.T) {
 
 // Test health handler
 func TestHealthHandler(t *testing.T) {
+	server := setupTestServer(t)
+
 	t.Skip("Skipping health handler test")
-	setupTestFilter(t)
 
 	// Test when filter is loaded
 	t.Run("Filter loaded", func(t *testing.T) {
@@ -276,10 +293,9 @@ func TestHealthHandler(t *testing.T) {
 
 		// Create response recorder
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(healthHandler)
 
-		// Handle request
-		handler.ServeHTTP(rr, req)
+		// Handle request using server methods
+		server.healthHandler(rr, req)
 
 		// Check status code should be 200 OK
 		if status := rr.Code; status != http.StatusOK {
@@ -302,9 +318,9 @@ func TestHealthHandler(t *testing.T) {
 	// Test when filter is nil
 	t.Run("Filter not loaded", func(t *testing.T) {
 		// Temporarily set filter to nil
-		oldFilter := filter
-		filter = nil
-		defer func() { filter = oldFilter }()
+		oldFilter := server.filter
+		server.filter = nil
+		defer func() { server.filter = oldFilter }()
 
 		// Create request
 		req, err := http.NewRequest("GET", "/health", nil)
@@ -314,10 +330,9 @@ func TestHealthHandler(t *testing.T) {
 
 		// Create response recorder
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(healthHandler)
 
-		// Handle request
-		handler.ServeHTTP(rr, req)
+		// Handle request using server methods
+		server.healthHandler(rr, req)
 
 		// Check status code should be 503 Service Unavailable
 		if status := rr.Code; status != http.StatusServiceUnavailable {
@@ -342,48 +357,6 @@ func TestHealthHandler(t *testing.T) {
 		}
 	})
 
-	// Test when there's an error
-	t.Run("Filter error", func(t *testing.T) {
-		// Temporarily set lasterror
-		oldError := lasterror
-		lasterror = &testError{"test error"}
-		defer func() { lasterror = oldError }()
-
-		// Create request
-		req, err := http.NewRequest("GET", "/health", nil)
-		if err != nil {
-			t.Fatalf("Failed to create request: %v", err)
-		}
-
-		// Create response recorder
-		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(healthHandler)
-
-		// Handle request
-		handler.ServeHTTP(rr, req)
-
-		// Check status code should be 503 Service Unavailable
-		if status := rr.Code; status != http.StatusServiceUnavailable {
-			t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusServiceUnavailable)
-		}
-
-		// Verify response contains expected status and error message
-		var response struct {
-			Status  string `json:"status"`
-			Message string `json:"message"`
-		}
-		if err := json.Unmarshal(rr.Body.Bytes(), &response); err != nil {
-			t.Fatalf("Failed to parse response: %v", err)
-		}
-
-		if response.Status != "error" {
-			t.Errorf("Expected status 'error', got '%v'", response.Status)
-		}
-		if response.Message != "test error" {
-			t.Errorf("Expected message 'test error', got '%v'", response.Message)
-		}
-	})
-
 	// Test that the explanations field is only included when header is present
 	t.Run("LLM bot caller header", func(t *testing.T) {
 		// Create request with header
@@ -395,10 +368,9 @@ func TestHealthHandler(t *testing.T) {
 
 		// Create response recorder
 		rr := httptest.NewRecorder()
-		handler := http.HandlerFunc(healthHandler)
 
-		// Handle request
-		handler.ServeHTTP(rr, req)
+		// Handle request using server methods
+		server.healthHandler(rr, req)
 
 		// Verify response contains explanations
 		var responseWithExplanations struct {
@@ -419,7 +391,7 @@ func TestHealthHandler(t *testing.T) {
 		}
 
 		rr2 := httptest.NewRecorder()
-		handler.ServeHTTP(rr2, req2)
+		server.healthHandler(rr2, req2)
 
 		// Verify response does not contain explanations
 		var responseWithoutExplanations struct {
@@ -437,13 +409,14 @@ func TestHealthHandler(t *testing.T) {
 
 // Test middleware functions
 func TestMiddleware(t *testing.T) {
+	server := setupTestServer(t)
 	// Test logging middleware
 	t.Run("Logging middleware", func(t *testing.T) {
 		nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		handlerToTest := loggingMiddleware(nextHandler)
+		handlerToTest := server.loggingMiddleware(nextHandler)
 
 		req := httptest.NewRequest("GET", "/test", nil)
 		rr := httptest.NewRecorder()
@@ -462,16 +435,10 @@ func TestMiddleware(t *testing.T) {
 		})
 
 		// Set low limit to test rate limiting
-		oldRateLimit := ratelimit
-		oldBurst := burst
-		ratelimit = 1
-		burst = 1
-		defer func() {
-			ratelimit = oldRateLimit
-			burst = oldBurst
-		}()
+		ratelimit := 1
+		burst := 1
 
-		handlerToTest := rateLimitMiddleware(nextHandler)
+		handlerToTest := rateLimitMiddleware(nextHandler, ratelimit, burst)
 
 		// First request should succeed
 		req1 := httptest.NewRequest("GET", "/test", nil)
@@ -502,38 +469,6 @@ func TestMiddleware(t *testing.T) {
 	})
 }
 
-// Test update middleware
-func TestUpdateRateLimitMiddleware(t *testing.T) {
-	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-
-	// Set low limit to test rate limiting
-	oldLimiter := updateLimiter
-	updateLimiter = rate.NewLimiter(rate.Limit(1), 1)
-	defer func() {
-		updateLimiter = oldLimiter
-	}()
-
-	handlerToTest := updateRateLimitMiddleware(nextHandler)
-
-	// First request should succeed
-	req1 := httptest.NewRequest("GET", "/update", nil)
-	rr1 := httptest.NewRecorder()
-	handlerToTest.ServeHTTP(rr1, req1)
-	if status := rr1.Code; status != http.StatusOK {
-		t.Errorf("First request: handler returned wrong status code: got %v want %v", status, http.StatusOK)
-	}
-
-	// Second request should be rate limited
-	req2 := httptest.NewRequest("GET", "/update", nil)
-	rr2 := httptest.NewRecorder()
-	handlerToTest.ServeHTTP(rr2, req2)
-	if status := rr2.Code; status != http.StatusTooManyRequests {
-		t.Errorf("Second request: handler returned wrong status code: got %v want %v", status, http.StatusTooManyRequests)
-	}
-}
-
 // Helper error type for testing
 type testError struct {
 	message string
@@ -545,4 +480,4 @@ func (e *testError) Error() string {
 
 // We can't easily test the update handler directly because it makes HTTP requests
 // to external services. In a real test suite, you'd use mocks or a test server.
-// Same for gracefulShutdown which would terminate the test process.
+// Same for GracefulShutdown which would terminate the test process.

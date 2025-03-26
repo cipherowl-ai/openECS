@@ -1,20 +1,40 @@
-package main
+package ecsd
 
 import (
 	"context"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/proto"
+	"log/slog"
+	"net"
+	"os"
 	"time"
+
+	"github.com/cipherowl-ai/addressdb/proto"
+	"github.com/cipherowl-ai/addressdb/reload"
+	"github.com/cipherowl-ai/addressdb/store"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 // gRPC server implementation
-type ecsdServer struct {
+type EcsdServer struct {
 	proto.UnimplementedECSdServer
+	filter *store.BloomFilterStore
+	reload *reload.ReloadManager
+	logger *slog.Logger
+}
+
+func NewEcsdServer(filter *store.BloomFilterStore, reload *reload.ReloadManager, logger *slog.Logger) *EcsdServer {
+	return &EcsdServer{
+		filter: filter,
+		reload: reload,
+		logger: logger,
+	}
 }
 
 // CheckAddress implements the gRPC CheckAddress method
-func (s *ecsdServer) CheckAddress(ctx context.Context, req *proto.CheckAddressRequest) (*proto.CheckAddressResponse, error) {
-	found, err := filter.CheckAddress(req.Address)
+func (s *EcsdServer) CheckAddress(ctx context.Context, req *proto.CheckAddressRequest) (*proto.CheckAddressResponse, error) {
+	found, err := s.filter.CheckAddress(req.Address)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +46,7 @@ func (s *ecsdServer) CheckAddress(ctx context.Context, req *proto.CheckAddressRe
 }
 
 // BatchCheckAddresses implements the gRPC BatchCheckAddresses method
-func (s *ecsdServer) BatchCheckAddresses(ctx context.Context, req *proto.BatchCheckRequest) (*proto.BatchCheckResponse, error) {
+func (s *EcsdServer) BatchCheckAddresses(ctx context.Context, req *proto.BatchCheckRequest) (*proto.BatchCheckResponse, error) {
 	if len(req.Addresses) > 100 {
 		return nil, fmt.Errorf("too many addresses, maximum is 100")
 	}
@@ -35,7 +55,7 @@ func (s *ecsdServer) BatchCheckAddresses(ctx context.Context, req *proto.BatchCh
 	notFound := make([]string, 0)
 
 	for _, address := range req.Addresses {
-		if ok, err := filter.CheckAddress(address); ok && err == nil {
+		if ok, err := s.filter.CheckAddress(address); ok && err == nil {
 			found = append(found, address)
 		} else {
 			notFound = append(notFound, address)
@@ -51,8 +71,8 @@ func (s *ecsdServer) BatchCheckAddresses(ctx context.Context, req *proto.BatchCh
 }
 
 // InspectFilter implements the gRPC InspectFilter method
-func (s *ecsdServer) InspectFilter(ctx context.Context, req *proto.InspectRequest) (*proto.InspectResponse, error) {
-	stats := filter.GetStats()
+func (s *EcsdServer) InspectFilter(ctx context.Context, req *proto.InspectRequest) (*proto.InspectResponse, error) {
+	stats := s.filter.GetStats()
 
 	return &proto.InspectResponse{
 		K:                 int32(stats.K),
@@ -60,6 +80,28 @@ func (s *ecsdServer) InspectFilter(ctx context.Context, req *proto.InspectReques
 		N:                 int64(stats.N),
 		EstimatedCapacity: int64(stats.EstimatedCapacity),
 		FalsePositiveRate: stats.FalsePositiveRate,
-		LastUpdate:        lastFilterLoadTime.Format(time.RFC3339),
+		LastUpdate:        s.reload.LastLoadTime().Format(time.RFC3339),
 	}, nil
+}
+
+func (s *EcsdServer) StartGRPCServer(grpcPort int) {
+	// Start gRPC server in a goroutine
+	go func() {
+		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+		if err != nil {
+			s.logger.Error("Failed to listen for gRPC", "error", err)
+			os.Exit(1)
+		}
+
+		srv := grpc.NewServer()
+		proto.RegisterECSdServer(srv, s)
+		// Enable reflection for debugging
+		reflection.Register(srv)
+
+		s.logger.Info("Starting gRPC server", "port", grpcPort)
+		if err := srv.Serve(lis); err != nil {
+			s.logger.Error("Failed to serve gRPC", "error", err)
+			os.Exit(1)
+		}
+	}()
 }

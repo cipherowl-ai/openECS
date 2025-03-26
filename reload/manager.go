@@ -3,9 +3,12 @@ package reload
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"sync"
+	"time"
+
 	"github.com/cipherowl-ai/addressdb/store"
 	"golang.org/x/sync/errgroup"
-	"log"
 )
 
 // ReloadManager manages the BloomFilterStore and handles notifications for reloading.
@@ -15,6 +18,9 @@ type ReloadManager struct {
 	eg       *errgroup.Group // Error group to manage concurrent operations.
 	ctx      context.Context
 	cancel   context.CancelFunc
+	logger   *slog.Logger
+	mu       sync.RWMutex
+	lastLoad time.Time
 }
 
 // NewReloadManager creates a new ReloadManager with a specified notification mechanism.
@@ -22,6 +28,17 @@ func NewReloadManager(store *store.BloomFilterStore, notifier Notifier) *ReloadM
 	return &ReloadManager{
 		store:    store,
 		notifier: notifier,
+		logger:   slog.Default(),
+	}
+}
+
+// NewReloadManager creates a new ReloadManager with a specified notification mechanism.
+func NewReloadManagerWithLogger(store *store.BloomFilterStore, notifier Notifier, logger *slog.Logger) *ReloadManager {
+	return &ReloadManager{
+		store:    store,
+		notifier: notifier,
+		logger:   logger,
+		lastLoad: time.Unix(0, 0),
 	}
 }
 
@@ -34,12 +51,25 @@ func (m *ReloadManager) Start(ctx context.Context) error {
 	m.eg.Go(func() error {
 		// Pass a reload callback to the notifier.
 		return m.notifier.WatchForChange(m.ctx, func(filePath string) error {
-			log.Println("Reloading Bloom filter due to notification.")
-			return m.store.LoadFromFile(filePath) // Reload the Bloom filter.
+			m.logger.Info("Reloading Bloom filter due to notification.")
+			if err := m.store.LoadFromFile(filePath); err != nil {
+				m.logger.Error("Error reloading Bloom filter", "error", err)
+				return err
+			}
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			m.lastLoad = time.Now()
+			return nil
 		})
 	})
 
 	return nil
+}
+
+func (m *ReloadManager) LastLoadTime() time.Time {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.lastLoad
 }
 
 // Stop halts the notification process and waits for ongoing operations to complete.

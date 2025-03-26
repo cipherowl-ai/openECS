@@ -3,6 +3,7 @@ package reload
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 )
@@ -35,7 +36,7 @@ func TestRemoteNotifier_CheckAndNotify(t *testing.T) {
 			name: "successful update",
 			metadata: &EcsDataset{
 				FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-				LastModified: time.Now(),
+				LastModified: time.Now().Unix(),
 				Checksum:     "test-checksum",
 			},
 			expectCallback: true,
@@ -50,7 +51,7 @@ func TestRemoteNotifier_CheckAndNotify(t *testing.T) {
 			name: "download error",
 			metadata: &EcsDataset{
 				FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-				LastModified: time.Now(),
+				LastModified: time.Now().Unix(),
 				Checksum:     "test-checksum",
 			},
 			downloadErr: fmt.Errorf("download error"),
@@ -71,7 +72,8 @@ func TestRemoteNotifier_CheckAndNotify(t *testing.T) {
 				"test-file",
 				"/tmp/test-file",
 				client,
-				time.Minute,
+				1*time.Minute,
+				slog.Default(),
 			)
 
 			callbackCalled := false
@@ -106,7 +108,7 @@ func TestRemoteNotifier_WatchForChange(t *testing.T) {
 			name: "successful initial check",
 			metadata: &EcsDataset{
 				FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-				LastModified: time.Now(),
+				LastModified: time.Now().Unix(),
 				Checksum:     "test-checksum",
 			},
 			expectCallback: true,
@@ -133,6 +135,7 @@ func TestRemoteNotifier_WatchForChange(t *testing.T) {
 				"/tmp/test-file",
 				client,
 				100*time.Millisecond,
+				slog.Default(),
 			)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
@@ -164,7 +167,7 @@ func TestRemoteNotifier_Close(t *testing.T) {
 	client := &mockRemoteClient{
 		metadata: &EcsDataset{
 			FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-			LastModified: time.Now(),
+			LastModified: time.Now().Unix(),
 			Checksum:     "test-checksum",
 		},
 	}
@@ -173,7 +176,8 @@ func TestRemoteNotifier_Close(t *testing.T) {
 		"test-file",
 		"/tmp/test-file",
 		client,
-		time.Minute,
+		1*time.Minute,
+		slog.Default(),
 	)
 
 	// Start watching in a goroutine
@@ -210,7 +214,7 @@ func TestRemoteNotifier_ConcurrentUpdates(t *testing.T) {
 	client := &mockRemoteClient{
 		metadata: &EcsDataset{
 			FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-			LastModified: time.Now(),
+			LastModified: time.Now().Unix(),
 			Checksum:     "test-checksum",
 		},
 	}
@@ -221,6 +225,7 @@ func TestRemoteNotifier_ConcurrentUpdates(t *testing.T) {
 		"/tmp/test-file",
 		client,
 		100*time.Millisecond,
+		slog.Default(),
 	)
 
 	// Run multiple concurrent checks
@@ -244,7 +249,7 @@ func TestRemoteNotifier_CallbackError(t *testing.T) {
 	client := &mockRemoteClient{
 		metadata: &EcsDataset{
 			FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-			LastModified: time.Now(),
+			LastModified: time.Now().Unix(),
 			Checksum:     "test-checksum",
 		},
 	}
@@ -254,7 +259,8 @@ func TestRemoteNotifier_CallbackError(t *testing.T) {
 		"test-file",
 		"/tmp/test-file",
 		client,
-		time.Minute,
+		1*time.Minute,
+		slog.Default(),
 	)
 
 	expectedErr := fmt.Errorf("callback error")
@@ -274,7 +280,7 @@ func TestRemoteNotifier_ContextCancellation(t *testing.T) {
 	client := &mockRemoteClient{
 		metadata: &EcsDataset{
 			FileURL:      "https://test-bucket.s3.amazonaws.com/test-key",
-			LastModified: time.Now(),
+			LastModified: time.Now().Unix(),
 			Checksum:     "test-checksum",
 		},
 	}
@@ -284,7 +290,8 @@ func TestRemoteNotifier_ContextCancellation(t *testing.T) {
 		"test-file",
 		"/tmp/test-file",
 		client,
-		time.Minute,
+		1*time.Minute,
+		slog.Default(),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())

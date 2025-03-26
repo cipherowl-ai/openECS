@@ -1,20 +1,32 @@
-package main
+package ecsd
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
+	"syscall"
 	"time"
 
+	"github.com/cipherowl-ai/addressdb/ecsd/config"
 	"github.com/cipherowl-ai/addressdb/store"
 	"github.com/gorilla/mux"
 	"golang.org/x/time/rate"
 )
+
+// The mapping of valid header values for efficient lookup
+var llmCallerValues = map[string]bool{
+	"on":   true,
+	"true": true,
+	"1":    true,
+	"yes":  true,
+	"y":    true,
+}
 
 type Response struct {
 	Query        string            `json:"query"`
@@ -39,8 +51,38 @@ type UpdateRequest struct {
 	URL string `json:"url"`
 }
 
-// Health check endpoint
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+type LoaderInfo interface {
+	LastLoadTime() time.Time
+}
+
+// Introduce HTTPServer struct to hold references instead of global variables
+type HTTPServer struct {
+	filter  *store.BloomFilterStore
+	reload  LoaderInfo
+	logger  *slog.Logger
+	httpSrv *http.Server
+	config  *config.ServerConfig
+}
+
+// NewHTTPServer constructor that wires dependencies into the struct.
+// You can adapt the arguments here to fit your usage (for instance, pass in a custom config if needed).
+func NewHTTPServer(
+	filter *store.BloomFilterStore,
+	reload LoaderInfo,
+	logger *slog.Logger,
+	config *config.ServerConfig,
+) *HTTPServer {
+	return &HTTPServer{
+		filter:  filter,
+		reload:  reload,
+		logger:  logger,
+		httpSrv: nil,
+		config:  config,
+	}
+}
+
+// Refactor original healthHandler into a receiver method
+func (hs *HTTPServer) healthHandler(w http.ResponseWriter, r *http.Request) {
 	response := struct {
 		Status       string            `json:"status"`
 		Message      string            `json:"message,omitempty"`
@@ -50,16 +92,12 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		Status: "ok",
 	}
 
-	// Check if filter is nil or there's a previous error
-	if filter == nil {
+	if hs.filter == nil || hs.reload.LastLoadTime().IsZero() {
 		response.Status = "error"
 		response.Message = "Bloom filter not loaded"
-	} else if lasterror != nil {
-		response.Status = "error"
-		response.Message = lasterror.Error()
 	} else {
 		// Filter is loaded, add stats
-		stats := filter.GetStats()
+		stats := hs.filter.GetStats()
 		response.Filter = fmt.Sprintf("loaded (elements: %d, capacity: %d)",
 			stats.N, stats.EstimatedCapacity)
 	}
@@ -78,24 +116,19 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// if lastFilterLoadTime is more than 24 hour, call updateHandler
-	if time.Since(lastFilterLoadTime) > 24*time.Hour {
-		updateHandler(w, r)
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
 // Check if an address is in the Bloom filter
-func checkHandler(w http.ResponseWriter, r *http.Request) {
+func (hs *HTTPServer) checkHandler(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("address")
 	if query == "" {
 		http.Error(w, `{"error": "Missing 'address' parameter"}`, http.StatusBadRequest)
 		return
 	}
 
-	found, err := filter.CheckAddress(query)
+	found, err := hs.filter.CheckAddress(query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": "Error checking address: %v"}`, err), http.StatusInternalServerError)
 		return
@@ -121,7 +154,7 @@ func checkHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Batch check addresses in the Bloom filter
-func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
+func (hs *HTTPServer) batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 	var requestBody BatchCheckRequest
 
 	// Parse from request body
@@ -147,7 +180,7 @@ func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 	notFound := make([]string, 0)
 
 	for _, address := range requestBody.Addresses {
-		if ok, err := filter.CheckAddress(address); ok && err == nil {
+		if ok, err := hs.filter.CheckAddress(address); ok && err == nil {
 			found = append(found, address)
 		} else {
 			notFound = append(notFound, address)
@@ -176,10 +209,8 @@ func batchCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Inspect the Bloom filter
-func inspectHandler(w http.ResponseWriter, r *http.Request) {
-	stats := filter.GetStats()
-
-	lastUpdate := lastFilterLoadTime.Format(time.RFC3339)
+func (hs *HTTPServer) inspectHandler(w http.ResponseWriter, r *http.Request) {
+	stats := hs.filter.GetStats()
 
 	response := struct {
 		Stats        store.BloomStats  `json:"stats"`
@@ -188,7 +219,7 @@ func inspectHandler(w http.ResponseWriter, r *http.Request) {
 		Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
 	}{
 		Stats:      stats,
-		LastUpdate: lastUpdate,
+		LastUpdate: hs.reload.LastLoadTime().Format(time.RFC3339),
 	}
 
 	// Only include explanations if the bot caller header is present
@@ -207,141 +238,31 @@ func inspectHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Update the Bloom filter from a remote URL specified in baseURL
-// reload the Bloom filter from the file downloaded from baseURL
-// reload it safely using a mutex
-// ensure the reload is done before replacing the filter variable
-// run filter stats and update the stats in the response
-// TODO:
-// 1. test with CO backend with real data
-// 2. test with failure cases
-func updateHandler(w http.ResponseWriter, r *http.Request) {
-	// Create HTTP client
-	client := &http.Client{
-		Timeout: 60 * time.Second,
-	}
-
-	// Construct URL from baseURL
-	url := fmt.Sprintf("https://%s/api/bloomfilter", baseURL)
-
-	// Log the operation
-	logger.Printf("Downloading Bloom filter from URL: %s", url)
-
-	// Create request
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to create HTTP request: %v"}`, err), http.StatusInternalServerError)
-		return
-	}
-
-	// Add authentication if needed
-	if clientID != "" && clientSecret != "" {
-		req.SetBasicAuth(clientID, clientSecret)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to download file: %v"}`, err), http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to download file, status: %s"}`, resp.Status), http.StatusInternalServerError)
-		return
-	}
-
-	// test if BLOOMFILTER_PATH is set
-	// if it is set, download the file to the path
-	// if it is not set, create a temporary file
-	// Create temporary file
-	tempFile, err := os.CreateTemp("", "bloomfilter-*.gob")
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to create temporary file: %v"}`, err), http.StatusInternalServerError)
-		return
-	}
-	tempFilePath := tempFile.Name()
-	defer os.Remove(tempFilePath) // Clean up temp file
-
-	// Copy downloaded data to temp file
-	_, err = io.Copy(tempFile, resp.Body)
-	tempFile.Close() // Close the file before loading it
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to save downloaded file: %v"}`, err), http.StatusInternalServerError)
-		return
-	}
-
-	// Load the new filter data directly into the existing filter
-	err = filter.LoadFromFile(tempFilePath)
-	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error": "Failed to reload new Bloom filter: %v"}`, err), http.StatusInternalServerError)
-		return
-	}
-
-	// Update the last load time
-	lastFilterLoadTime = time.Now().UTC()
-
-	// Clear any previous errors
-	lasterror = nil
-
-	// Get the stats after successful reload
-	stats := filter.GetStats()
-
-	// Prepare response
-	response := struct {
-		Status       string            `json:"status"`
-		Message      string            `json:"message"`
-		Stats        store.BloomStats  `json:"stats"`
-		Explanations map[string]string `json:"__llm_explanations__data_dictionary__,omitempty"`
-	}{
-		Status:  "success",
-		Message: "Bloom filter updated successfully",
-		Stats:   stats,
-	}
-
-	// Only include explanations if the bot caller header is present
-	if shouldIncludeExplanations(r) {
-		response.Explanations = map[string]string{
-			"status":                    "Operation status",
-			"message":                   "Status description",
-			"stats.k":                   "Hash function count",
-			"stats.m":                   "Bit array size",
-			"stats.n":                   "Element count",
-			"stats.estimated_capacity":  "Maximum capacity estimate",
-			"stats.false_positive_rate": "Current false positive probability",
-		}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
-
-func gracefulShutdown(srv *http.Server) {
+func (hs *HTTPServer) GracefulShutdown() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	srv.Shutdown(ctx)
-	logger.Println("shutting down")
+	hs.httpSrv.Shutdown(ctx)
+	hs.logger.Info("shutting down")
 	os.Exit(0)
 }
 
 // StartHTTPServer creates the HTTP server with routes and returns it.
-func StartHTTPServer(port int) *http.Server {
+func (hs *HTTPServer) StartHTTPServer(port int) {
+
 	r := mux.NewRouter()
-	r.Use(loggingMiddleware)
+	r.Use(hs.loggingMiddleware)
 
-	// Use the same route definitions as before
-	r.Handle("/check", rateLimitMiddleware(http.HandlerFunc(checkHandler))).Methods("GET")
-	r.Handle("/batch-check", rateLimitMiddleware(http.HandlerFunc(batchCheckHandler))).Methods("POST")
-	r.Handle("/inspect", rateLimitMiddleware(http.HandlerFunc(inspectHandler))).Methods("GET")
-	r.Handle("/update", updateRateLimitMiddleware(http.HandlerFunc(updateHandler))).Methods("PATCH")
-	r.Handle("/health", http.HandlerFunc(healthHandler)).Methods("GET")
+	r.Handle("/check", rateLimitMiddleware(http.HandlerFunc(hs.checkHandler), hs.config.RateLimit, hs.config.Burst)).Methods("GET")
+	r.Handle("/batch-check", rateLimitMiddleware(http.HandlerFunc(hs.batchCheckHandler), hs.config.RateLimit, hs.config.Burst)).Methods("POST")
+	r.Handle("/inspect", rateLimitMiddleware(http.HandlerFunc(hs.inspectHandler), hs.config.RateLimit, hs.config.Burst)).Methods("GET")
+	r.Handle("/health", http.HandlerFunc(hs.healthHandler)).Methods("GET")
 
-	httpSrv := &http.Server{
+	hs.httpSrv = &http.Server{
 		Addr:         ":" + strconv.Itoa(port),
 		Handler:      r,
 		ReadTimeout:  15 * time.Second,
@@ -350,39 +271,34 @@ func StartHTTPServer(port int) *http.Server {
 	}
 
 	go func() {
-		logger.Printf("Starting HTTP server on port %d", port)
-		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Could not listen on %d: %v\n", port, err)
+		hs.logger.Info("Starting HTTP server", "port", port)
+		if err := hs.httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			hs.logger.Error("Could not listen on port", "port", port, "error", err)
 		}
 	}()
+}
 
-	return httpSrv
+// shouldIncludeExplanations checks if explanations for LLM bots should be included in the response
+// Using a map lookup with case-insensitive comparison for maximum compatibility and O(1) time complexity
+func shouldIncludeExplanations(r *http.Request) bool {
+	headerValue := strings.ToLower(r.Header.Get("__llm_bot_caller__"))
+	return llmCallerValues[headerValue]
 }
 
 // If these middleware functions used to live in main.go, move them here:
-func loggingMiddleware(next http.Handler) http.Handler {
+func (hs *HTTPServer) loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		next.ServeHTTP(w, r)
-		logger.Printf("%s %s %s %s", r.Method, r.RequestURI, r.RemoteAddr, time.Since(start))
+		hs.logger.Info("Request processed", "method", r.Method, "uri", r.RequestURI, "remote_addr", r.RemoteAddr, "duration", time.Since(start))
 	})
 }
 
-func rateLimitMiddleware(next http.Handler) http.Handler {
+func rateLimitMiddleware(next http.Handler, ratelimit, burst int) http.Handler {
 	limiter := rate.NewLimiter(rate.Limit(ratelimit), burst)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !limiter.Allow() {
 			http.Error(w, "Too many requests", http.StatusTooManyRequests)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func updateRateLimitMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !updateLimiter.Allow() {
-			http.Error(w, "Too many update requests, limit is 1 per second", http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)

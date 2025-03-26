@@ -3,6 +3,7 @@ package reload
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -55,7 +56,7 @@ func TestDefaultRemoteClient_FetchMetadata(t *testing.T) {
 					w.Header().Set("Content-Type", "application/json")
 					metadata := EcsDataset{
 						FileURL:      "https://example.com/test.bloom",
-						LastModified: time.Now(),
+						LastModified: time.Now().Unix(),
 						Checksum:     "test-checksum",
 					}
 					if err := json.NewEncoder(w).Encode(metadata); err != nil {
@@ -93,7 +94,7 @@ func TestDefaultRemoteClient_FetchMetadata(t *testing.T) {
 				case "/api/ecs/ethereum/dataset/test-file":
 					metadata := EcsDataset{
 						FileURL:      "https://example.com/test.bloom",
-						LastModified: time.Now(),
+						LastModified: time.Now().Unix(),
 						Checksum:     "test-checksum",
 					}
 					json.NewEncoder(w).Encode(metadata)
@@ -150,7 +151,7 @@ func TestDefaultRemoteClient_FetchMetadata(t *testing.T) {
 			server := httptest.NewServer(tt.serverHandler)
 			defer server.Close()
 
-			client := NewRemoteClient(server.URL, "test-client", "test-secret")
+			client := NewRemoteClient(server.URL, "test-client", "test-secret", slog.Default())
 			metadata, err := client.FetchMetadata(tt.expectedChain, tt.expectedFileID)
 
 			if tt.expectedError {
@@ -220,7 +221,7 @@ func TestDefaultRemoteClient_DownloadFile(t *testing.T) {
 			server := httptest.NewServer(tt.serverHandler)
 			defer server.Close()
 
-			client := NewRemoteClient(server.URL, "test-client", "test-secret")
+			client := NewRemoteClient(server.URL, "test-client", "test-secret", slog.Default())
 
 			// Create a temporary file for testing
 			tmpfile, err := os.CreateTemp("", "test-download-*")
@@ -264,7 +265,7 @@ func TestDefaultRemoteClient_TokenRefresh(t *testing.T) {
 		case "/api/ecs/ethereum/dataset/test-file":
 			metadata := EcsDataset{
 				FileURL:      "https://example.com/test.bloom",
-				LastModified: time.Now(),
+				LastModified: time.Now().Unix(),
 				Checksum:     "test-checksum",
 			}
 			json.NewEncoder(w).Encode(metadata)
@@ -272,7 +273,7 @@ func TestDefaultRemoteClient_TokenRefresh(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewRemoteClient(server.URL, "test-client", "test-secret")
+	client := NewRemoteClient(server.URL, "test-client", "test-secret", slog.Default())
 
 	// First request should get a token
 	_, err := client.FetchMetadata("ethereum", "test-file")
@@ -309,7 +310,7 @@ func TestDefaultRemoteClient_Concurrent(t *testing.T) {
 			}
 			metadata := EcsDataset{
 				FileURL:      "https://example.com/test.bloom",
-				LastModified: time.Now(),
+				LastModified: time.Now().Unix(),
 				Checksum:     "test-checksum",
 			}
 			json.NewEncoder(w).Encode(metadata)
@@ -317,7 +318,7 @@ func TestDefaultRemoteClient_Concurrent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := NewRemoteClient(server.URL, "test-client", "test-secret")
+	client := NewRemoteClient(server.URL, "test-client", "test-secret", slog.Default())
 
 	// Run concurrent requests
 	concurrency := 10

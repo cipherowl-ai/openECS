@@ -12,30 +12,64 @@ This is a Edge compliance service for Bloom filter. It is a simple HTTP service 
 
 ## Configuration
 
-The service can be configured using command line options:
+The service can be configured using command line options or environment variables. Environment variables take precedence over command line flags.
 
-- `-f`: the path to the Bloom filter file (default: "bloomfilter.gob"), by default it is in .co_data
-- `-p`: the port to listen on (default: 8080)
-- `-r`: the rate limit (default: 20)
-- `-b`: the burst (default: 5)
-- `-private-key-file`: the path to the private key file (optional)
-- `-public-key-file`: the path to the public key file (optional)
+### Command Line Options
 
-Environment variables can be set in a `.env` file in the service root directory:
+- `-f, --filename`: Path to the Bloom filter file (default: "bloomfilter.gob")
+- `-p, --port`: HTTP port to listen on (default: 8080)
+- `--grpc-port`: gRPC port to listen on (default: 9090)
+- `-r, --ratelimit`: Rate limit for requests (default: 20)
+- `-b, --burst`: Burst limit for rate limiting (default: 5)
+- `--decrypt-key`: Path to the decrypt key file (optional)
+- `--signing-key`: Path to the signing key file (optional)
+- `--decrypt-key-passphrase`: Passphrase for the decrypt key (optional)
+- `--chain`: Chain name (required)
+- `--dataset`: Dataset name (required)
+- `--base-url`: Base URL for the API (required)
+- `--client-id`: Client ID for authentication (required)
+- `--client-secret`: Client secret for authentication (required)
 
-- `CO_CLIENT_ID`: the client ID
-- `CO_CLIENT_SECRET`: the client secret
-- `CO_BASE_URL`: the base URL (default: "svc.cipherowl.ai")
-- `CO_ENV`: the environment (default: "prod")
-- `KEY_PASSPHRASE`: the passphrase for the private key
+### Environment Variables
+
+All environment variables are prefixed with `CO_` and use underscores instead of hyphens. For example, `--decrypt-key` becomes `CO_DECRYPT_KEY`.
+
+- `CO_FILENAME`: Bloom filter file path
+- `CO_PORT`: HTTP port
+- `CO_GRPC_PORT`: gRPC port
+- `CO_RATELIMIT`: Rate limit
+- `CO_BURST`: Burst limit
+- `CO_DECRYPT_KEY`: Path to decrypt key file
+- `CO_SIGNING_KEY`: Path to signing key file
+- `CO_DECRYPT_KEY_PASSPHRASE`: Decrypt key passphrase
+- `CO_CHAIN`: Chain name
+- `CO_DATASET`: Dataset name
+- `CO_BASE_URL`: Base URL for the API
+- `CO_CLIENT_ID`: Client ID
+- `CO_CLIENT_SECRET`: Client secret
+
+### Example Usage
+
+```bash
+# Using command line flags
+./ecsd --chain ethereum_mainnet --dataset co-demo --base-url https://api.example.com \
+       --client-id your_client_id --client-secret your_client_secret
+
+# Using environment variables
+export CO_CHAIN=ethereum_mainnet
+export CO_DATASET=co-demo
+export CO_BASE_URL=https://api.example.com
+export CO_CLIENT_ID=your_client_id
+export CO_CLIENT_SECRET=your_client_secret
+./ecsd
+```
 
 ## Building and Running
 
 ### Build
 
 ```bash
-cd cmd/ecsd
-go build -o ecsd
+go build -o ecsd cmd/ecsd/main.go
 ```
 
 ### Run
@@ -95,7 +129,7 @@ docker run -p 8080:8080 \
 ### Check an address
 
 ```bash
-curl "http://localhost:8080/check?address=0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+curl "http://localhost:8080/check?address=0x96244d83dc15d36847c35209bbdc5bdde9bec3d8"
 ```
 
 ### Batch check addresses
@@ -103,7 +137,7 @@ curl "http://localhost:8080/check?address=0x742d35Cc6634C0532925a3b844Bc454e4438
 ```bash
 curl -X POST \
   -H "Content-Type: application/json" \
-  -d '{"addresses":["0x742d35Cc6634C0532925a3b844Bc454e4438f44e","0x1111111111111111111111111111111111111111"]}' \
+  -d '{"addresses":["0x96244d83dc15d36847c35209bbdc5bdde9bec3d8","0x1111111111111111111111111111111111111111"]}' \
   "http://localhost:8080/batch-check"
 ```
 
@@ -111,12 +145,6 @@ curl -X POST \
 
 ```bash
 curl "http://localhost:8080/inspect"
-```
-
-### Update the Bloom filter
-
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"url":"https://example.com/bloomfilter.gob"}' "http://localhost:8080/update"
 ```
 
 ### Health check
@@ -130,12 +158,12 @@ curl "http://localhost:8080/health"
 with a special header `__llm_bot_caller__: on`, the service will return explanations for LLM bots which returns a data dictionary of the json response to help the bot works better
 
 ```bash
-curl http://localhost:8080/check?address=0x742d35Cc6634C0532925a3b844Bc454e4438f44e -H "__llm_bot_caller__: on"
+curl "http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE" -H "__llm_bot_caller__: on" | jq
 ```
 
 ```json
 {
-  "query": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+  "query": "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE",
   "in_set": false,
   "message": "",
   "__llm_explanations__data_dictionary__": {
@@ -147,12 +175,12 @@ curl http://localhost:8080/check?address=0x742d35Cc6634C0532925a3b844Bc454e4438f
 ```
 
 ```bash
-curl http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE -H "__llm_bot_caller__: 1" |jq
+curl "http://localhost:8080/check?address=0x96244d83dc15d36847c35209bbdc5bdde9bec3d8" -H "__llm_bot_caller__: 1" | jq
 ```
 
 ```json
 {
-  "query": "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE",
+  "query": "0x96244d83dc15d36847c35209bbdc5bdde9bec3d8",
   "in_set": true,
   "message": "",
   "__llm_explanations__data_dictionary__": {
@@ -165,7 +193,7 @@ curl http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB25
 ```
 
 ```bash
-curl http://localhost:8080/inspect -H "__llm_bot_caller__: 1" |jq
+curl http://localhost:8080/inspect -H "__llm_bot_caller__: 1" | jq
 ```
 
 ```json
@@ -240,27 +268,28 @@ Example output:
 ### Check if an Address is in the Filter
 
 ```bash
-grpcurl -plaintext -d '{"address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"}' localhost:9090 proto.ECSd.CheckAddress
+grpcurl -plaintext -d '{"address": "0x96244d83dc15d36847c35209bbdc5bdde9bec3d8"}' localhost:9090 proto.ECSd.CheckAddress
 ```
 
 Example output:
 ```json
 {
-  "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
+  "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+  "isSet": true
 }
 ```
 
 ### Batch Check Multiple Addresses
 
 ```bash
-grpcurl -plaintext -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE"]}' localhost:9090 proto.ECSd.BatchCheckAddresses
+grpcurl -plaintext -d '{"addresses": ["0x742d35Cc6634C0532925a3b844Bc454e4438f44e", "0x96244d83dc15d36847c35209bbdc5bdde9bec3d8"]}' localhost:9090 proto.ECSd.BatchCheckAddresses
 ```
 
 Example output:
 ```json
 {
   "found": [
-    "0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE"
+    "0x96244d83dc15d36847c35209bbdc5bdde9bec3d8"
   ],
   "notFound": [
     "0x742d35Cc6634C0532925a3b844Bc454e4438f44e"
