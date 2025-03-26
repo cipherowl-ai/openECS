@@ -1,4 +1,4 @@
-# addressdb
+# openECS
 
 ## Status Of The Project
 
@@ -6,7 +6,7 @@ Ready to be used in prod
 
 ## Overview
 
-addressdb demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
+openECS demonstrates the use of Bloom filters to share sets of blockchain addresses while preserving privacy. It provides tools for generating Ethereum addresses, encoding them into a Bloom filter, and checking addresses against the filter.
 
 ## Key Features
 
@@ -26,9 +26,9 @@ The `.gob` file can be easily shared across data pipelines. Adding key-pair encr
 ## Installation
 
 ```bash
-git clone https://github.com/your-username/addressdb.git
+git clone https://github.com/cipherowl.ai/openECS.git
 git lfs pull
-cd addressdb
+cd openECS
 go mod tidy
 ```
 
@@ -192,7 +192,7 @@ Results in a ~450KB filter.
 go test -bench=. -benchmemstore % go test -bench=. -test.benchmem        
 goos: darwin
 goarch: arm64
-pkg: addressdb/store
+pkg: openECS/store
 BenchmarkAddAddress-16                  11823907               103.5 ns/op            48 B/op          1 allocs/op
 BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op            95 B/op          1 allocs/op
 BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
