@@ -27,7 +27,16 @@ The `.gob` file can be easily shared across data pipelines. Adding key-pair encr
 
 ```bash
 git clone https://github.com/your-username/addressdb.git
+git lfs pull
 cd addressdb
+go mod tidy
+```
+
+You may want to have the latest version of the protobuf and grpc tools installed.
+```bash
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go get google.golang.org/grpc@latest
 go mod tidy
 ```
 
@@ -91,7 +100,7 @@ pgpHandler := securedata.NewPGPSecureDataHandler(
 // Create a new Bloom filter store from a pgp encrypted file
 addressHandler := &address.EVMAddressHandler{}
 store, _ := NewBloomFilterStoreFromFile(filePath, addressHandler, WithSecureDataHandler(pgpHandler))
-````
+```
 
 ## CLI Usage
 
@@ -132,37 +141,6 @@ Batch mode:
 ```bash
 cat my_addresses.txt | go run cmd/cli/main.go batch-check -f bloomfilter.gob --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
 ```
-
-## Run the ECSD service
-
-```bash
-go run ecsd/main.go -f bloomfilter.gob -p 8080 -r 20 -b 5 
-```
-
-To use encryption keys, you can use the following command:
-
-```bash
-go run ecsd/main.go -f bloomfilter.gob -p 8080 -r 20 -b 5 -private-key-file securedata/testdata/privkey.asc -public-key-file securedata/testdata/pubkey.asc
-```
-
-To test the ECSD service, you can use the following command:
-
-```bash
-curl -X GET "http://localhost:8080/check?address=0x094b1D4CC901C182EF049d86c4245Cfb61704A8a" -H "Content-Type: application/json"
-```
-
-Batch check
-
-```
-curl -X POST "http://localhost:8080/batch-check" -H "Content-Type: application/json" -d '{"addresses":["0x094b1D4CC901C182EF049d86c4245Cfb61704A8a","0x31bD83177c0fe1D4f0E6451507b969021C8293E6"]}'
-``` 
-
-Inspect the Bloom filter
-
-```bash
-curl -X GET "http://localhost:8080/inspect" -H "Content-Type: application/json"
-```
-
 
 
 ## Large-Scale Example
@@ -219,6 +197,36 @@ BenchmarkAddAddress-16                  11823907               103.5 ns/op      
 BenchmarkBloomFilterTestNaive-16         5685646               212.2 ns/op            95 B/op          1 allocs/op
 BenchmarkCheckAddress-16                14392717                82.72 ns/op           48 B/op          1 allocs/op
 BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
+```
+#### Python client on a 32 core machine (local testing)
+```bash
+> python bench.py -f addresses.txt --duration 30 --concurrency 32
+Loaded 1,000 addresses from addresses.txt
+
+Starting load test with 1000 addresses
+Duration: 30 seconds, Concurrency: 10
+--------------------------------------------------------------------------------
+Progress: 29.6/30s | Requests: 163252 | Rate: 5509.2 req/s | Success: 100.0% | Errors: 0
+--------------------------------------------------------------------------------
+
+Test Results:
+--------------------------------------------------------------------------------
+Duration: 30.00 seconds
+Total Requests: 165,282
+Successful Requests: 165,282 (100.0%)
+Failed Requests: 0
+Requests per Second: 5509.3
+
+Latency Statistics (ms):
+  Min: 0.55
+  Max: 7.21
+  Avg: 1.81
+  Median: 1.81
+  95th percentile: 1.87
+  99th percentile: 1.91
+
+Status Codes:
+  200: 165,282 (100.0%)
 ```
 
 ## Limitations

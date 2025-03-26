@@ -35,6 +35,10 @@ func WithPublicKey(pubKey *crypto.Key) Option {
 
 func WithPublicKeyPath(filePath string) Option {
 	return func(h *OpenPGPSecureHandler) error {
+		if filePath == "" {
+			return nil
+		}
+
 		keyData, err := os.ReadFile(filePath)
 		if err != nil {
 			return err
@@ -50,6 +54,10 @@ func WithPublicKeyPath(filePath string) Option {
 
 func WithPrivateKeyPath(filePath string, passphrase string) Option {
 	return func(h *OpenPGPSecureHandler) error {
+		if filePath == "" {
+			return nil
+		}
+
 		keyData, err := os.ReadFile(filePath)
 		if err != nil {
 			return err
