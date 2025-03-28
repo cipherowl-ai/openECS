@@ -130,16 +130,11 @@ Interactive mode:
 ```bash
 go run cmd/cli/main.go check -f bloomfilter.gob 
 ```
-You can also specify the environment (default is prod):
-
-```bash
-go run cmd/cli/main.go check -f bloomfilter.gob  
-```
 
 Batch mode:
 
 ```bash
-cat my_addresses.txt | go run cmd/cli/main.go batch-check -f bloomfilter.gob --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+cat my_addresses.txt | go run cmd/cli/main.go batch-check -f bloomfilter.gob
 ```
 
 
@@ -199,34 +194,39 @@ BenchmarkCheckAddress-16                14392717                82.72 ns/op     
 BenchmarkBloomFilterNaiveCheck-16        5969546               214.6 ns/op            95 B/op          1 allocs/op
 ```
 #### Python client on a 32 core machine (local testing)
+start the docker container with a very high rate limit
+```
+ docker run --env-file docker.env -p 8080:8080 -p 9090:9090 -v $(pwd)/ecsd/keypair/:/app/keys  ecsd:latest
+```
+run the python script to test the performance of the service.
 ```bash
-> python bench.py -f addresses.txt --duration 30 --concurrency 32
-Loaded 1,000 addresses from addresses.txt
+> python bench.py -f demo_addresses.txt --duration 30 --concurrency 32
+Loaded 10 addresses from demo_addresses.txt
 
-Starting load test with 1000 addresses
-Duration: 30 seconds, Concurrency: 10
+Starting load test with 10 addresses
+Duration: 30 seconds, Concurrency: 32
 --------------------------------------------------------------------------------
-Progress: 29.6/30s | Requests: 163252 | Rate: 5509.2 req/s | Success: 100.0% | Errors: 0
+Progress: 29.8/30s | Requests: 391588 | Rate: 13140.7 req/s | Success: 100.0% | Errors: 0
 --------------------------------------------------------------------------------
 
 Test Results:
 --------------------------------------------------------------------------------
 Duration: 30.00 seconds
-Total Requests: 165,282
-Successful Requests: 165,282 (100.0%)
+Total Requests: 394,589
+Successful Requests: 394,589 (100.0%)
 Failed Requests: 0
-Requests per Second: 5509.3
+Requests per Second: 13152.4
 
 Latency Statistics (ms):
-  Min: 0.55
-  Max: 7.21
-  Avg: 1.81
-  Median: 1.81
-  95th percentile: 1.87
-  99th percentile: 1.91
+  Min: 0.28
+  Max: 95.64
+  Avg: 2.43
+  Median: 2.24
+  95th percentile: 4.03
+  99th percentile: 6.94
 
 Status Codes:
-  200: 165,282 (100.0%)
+  200: 394,589 (100.0%)
 ```
 
 ## Limitations

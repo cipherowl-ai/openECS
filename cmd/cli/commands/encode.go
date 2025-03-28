@@ -3,44 +3,43 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 	"os"
 
 	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/internal/config"
 	"github.com/cipherowl-ai/addressdb/store"
 
 	"github.com/spf13/cobra"
 )
 
-var EncodeCmd = &cobra.Command{
-	Use:   "encode",
-	Short: "Encode addresses into a Bloom filter",
-	Run:   runEncode,
-}
-
-var (
-	nFlag                uint
-	pFlag                float64
-	inputFile            string
-	outputFile           string
-	privateKeyFile       string
-	publicKeyFile        string
-	privateKeyPassphrase string
-)
-
 func init() {
-	EncodeCmd.Flags().UintVarP(&nFlag, "number", "n", 10000000, "number of elements expected")
-	EncodeCmd.Flags().Float64VarP(&pFlag, "probability", "p", 0.00001, "false positive probability")
-	EncodeCmd.Flags().StringVarP(&inputFile, "input", "i", "addresses.txt", "input file path")
-	EncodeCmd.Flags().StringVarP(&outputFile, "output", "o", "bloomfilter.gob", "output file path")
-	EncodeCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the sender private key file (optional)")
-	EncodeCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the recipient public key file (optional)")
-	EncodeCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the sender private key (optional)")
+	writerConfig := &config.FilterWriterConfig{}
+
+	var encodeCmd = &cobra.Command{
+		Use:   "encode",
+		Short: "Encode addresses into a Bloom filter",
+		Run: func(cmd *cobra.Command, args []string) {
+			runEncode(cmd, writerConfig)
+		},
+	}
+	config.BindBloomWriterFlags(encodeCmd, writerConfig)
+
+	encodeCmd.Flags().UintP("number", "n", 10000000, "number of elements expected")
+	encodeCmd.Flags().Float64P("probability", "p", 0.00001, "false positive probability")
+	encodeCmd.Flags().StringP("input", "i", "addresses.txt", "input file path")
+
+	RootCmd.AddCommand(encodeCmd)
 }
 
-func runEncode(_ *cobra.Command, _ []string) {
+func runEncode(cmd *cobra.Command, writerCfg *config.FilterWriterConfig) {
+	nFlag, _ := cmd.Flags().GetUint("number")
+	pFlag, _ := cmd.Flags().GetFloat64("probability")
+	inputFile, _ := cmd.Flags().GetString("input")
+
 	addressHandler := &address.EVMAddressHandler{}
 
-	options, err := configurePGPHandler()
+	options, err := helper.ConfigurePGPHandler(writerCfg.SigningKey, writerCfg.SigningKeyPassphrase, writerCfg.EncryptKey)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
@@ -71,11 +70,11 @@ func runEncode(_ *cobra.Command, _ []string) {
 		os.Exit(-1)
 	}
 
-	if err := filter.SaveToFile(outputFile); err != nil {
+	if err := filter.SaveToFile(writerCfg.Filename); err != nil {
 		fmt.Println("Error saving Bloom filter:", err)
 		os.Exit(-1)
 	}
-	fmt.Printf("Bloom filter has been saved to %s successfully.\n", outputFile)
+	fmt.Printf("Bloom filter has been saved to %s successfully.\n", writerCfg.Filename)
 	// Print the statistics to verify the options were applied correctly
 	filter.PrintStats()
 }

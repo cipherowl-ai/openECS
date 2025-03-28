@@ -31,24 +31,16 @@ proto: setup
 
 # format
 fmt:
-	$(GOCMD) fmt ./address
-	$(GOCMD) fmt ./cmd
-	$(GOCMD) fmt ./reload
-	$(GOCMD) fmt ./securedata
-	$(GOCMD) fmt ./store
-	$(GOCMD) fmt ./proto
-	$(GOCMD) fmt ./ecsd
+	$(GOCMD) fmt ./...
 
 
 build-debug: prepare
 	$(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_NAME)-cli ./cmd/cli
-	$(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_NAME)-server ./cmd/server
-	$(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_NAME)-ecsd ./ecsd
+	$(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_NAME)-ecsd ./cmd/ecsd
 
 build-release: prepare
 	$(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_NAME)-cli ./cmd/cli
-	$(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_NAME)-server ./cmd/server
-	$(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_NAME)-ecsd ./ecsd
+	$(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_NAME)-ecsd ./cmd/ecsd
 prepare:
 	mkdir -p $(TARGET_DIR)/debug
 	mkdir -p $(TARGET_DIR)/release
@@ -60,21 +52,13 @@ clean:
 # Cross compilation
 build-linux-debug: prepare
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_UNIX)-cli ./cmd/cli
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_UNIX)-server ./cmd/server
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_UNIX)-ecsd ./ecsd
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(DEBUG_FLAGS) -o $(TARGET_DIR)/debug/$(BINARY_UNIX)-ecsd ./cmd/ecsd
 
 build-linux-release: prepare
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-cli ./cmd/cli
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-server ./cmd/server
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-ecsd ./ecsd
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-ecsd ./cmd/ecsd
 
 build-docker:
-	# if ths is linux
-	if [ "$(shell uname -s)" = "Linux" ]; then
-		make
-		docker build -t ecsd -f ecsd/Dockerfile .
-	else
-		echo "This build process is designed for Linux systems only."
-	fi
+	docker build -t ecsd -f ecsd/Dockerfile .
 
 .PHONY: all proto build-debug build-release clean build-linux-debug build-linux-release prepare
