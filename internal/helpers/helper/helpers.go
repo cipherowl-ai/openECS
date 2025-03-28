@@ -1,4 +1,4 @@
-package commands
+package helper
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/addressdb/internal/config"
 	"github.com/cipherowl-ai/addressdb/securedata"
 	"github.com/cipherowl-ai/addressdb/store"
 )
@@ -23,8 +24,8 @@ type tokenResponse struct {
 	Scope       string `json:"scope"`
 }
 
-// configurePGPHandler sets up the OpenPGPSecureHandler based on provided flags.
-func configurePGPHandler() ([]store.Option, error) {
+// ConfigurePGPHandler sets up the OpenPGPSecureHandler based on provided flags.
+func ConfigurePGPHandler(privateKeyFile, privateKeyPassphrase, publicKeyFile string) ([]store.Option, error) {
 	var options []store.Option
 	pgpOptions := []securedata.Option{}
 	// If no private key or public key is provided, return nil
@@ -50,15 +51,15 @@ func configurePGPHandler() ([]store.Option, error) {
 	return options, nil
 }
 
-// loadBloomFilter initializes the Bloom filter store with optional PGP handler.
-func loadBloomFilter(filename string) (*store.BloomFilterStore, error) {
-	options, err := configurePGPHandler()
+// LoadBloomFilter initializes the Bloom filter store with optional PGP handler.
+func LoadBloomFilter(cfg *config.FilterReaderConfig) (*store.BloomFilterStore, error) {
+	options, err := ConfigurePGPHandler(cfg.DecryptKey, cfg.DecryptKeyPassphrase, cfg.SigningKey)
 	if err != nil {
 		return nil, err
 	}
 
 	addressHandler := &address.EVMAddressHandler{}
-	filter, err := store.NewBloomFilterStoreFromFile(filename, addressHandler, options...)
+	filter, err := store.NewBloomFilterStoreFromFile(cfg.Filename, addressHandler, options...)
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %w", err)
 	}

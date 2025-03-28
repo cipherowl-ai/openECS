@@ -3,40 +3,38 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 	"io"
 	"os"
+
+	"github.com/cipherowl-ai/addressdb/internal/config"
 
 	"github.com/spf13/cobra"
 )
 
-var CheckCmd = &cobra.Command{
-	Use:   "check",
-	Short: "Check addresses against a Bloom filter",
-	Run:   runCheck,
-}
-
-var (
-	filename     string
-	env          string
-	clientID     string
-	clientSecret string
-)
-
 func init() {
-	CheckCmd.Flags().StringVarP(&filename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
-	CheckCmd.Flags().StringVar(&env, "env", "prod", "Environment (optional)")
-	CheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
-	CheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
-	CheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
+	readerConfig := &config.FilterReaderConfig{}
+
+	checkCmd := &cobra.Command{
+		Use:   "check",
+		Short: "Check addresses against a Bloom filter",
+		Run: func(cmd *cobra.Command, args []string) {
+			runCheck(cmd, readerConfig)
+		},
+	}
+
+	config.BindBloomReaderFlags(checkCmd, readerConfig)
+
+	RootCmd.AddCommand(checkCmd)
 }
 
-func runCheck(_ *cobra.Command, _ []string) {
+func runCheck(cmd *cobra.Command, readerCfg *config.FilterReaderConfig) {
 	// if err := checkAuth(clientID, clientSecret, env); err != nil {
 	// 	fmt.Printf("Authentication failed: %v\n", err)
 	// 	os.Exit(-1)
 	// }
 
-	filter, err := loadBloomFilter(filename)
+	filter, err := helper.LoadBloomFilter(readerCfg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)

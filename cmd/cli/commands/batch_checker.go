@@ -3,38 +3,38 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 	"io"
 	"os"
 	"time"
 
+	"github.com/cipherowl-ai/addressdb/internal/config"
 	"github.com/spf13/cobra"
 )
 
-var BatchCheckCmd = &cobra.Command{
-	Use:   "batch-check",
-	Short: "Check addresses in batch against a Bloom filter",
-	Run:   runBatchCheck,
-}
-
 func init() {
-	BatchCheckCmd.Flags().StringVarP(&filename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
-	BatchCheckCmd.Flags().StringVar(&privateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
-	BatchCheckCmd.Flags().StringVar(&publicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
-	BatchCheckCmd.Flags().StringVar(&privateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
-	BatchCheckCmd.Flags().StringVar(&env, "env", "prod", "Environment (optional)")
-	BatchCheckCmd.Flags().StringVar(&clientID, "client-id", "", "OAuth client ID (required)")
-	BatchCheckCmd.Flags().StringVar(&clientSecret, "client-secret", "", "OAuth client secret (required)")
-	BatchCheckCmd.MarkFlagRequired("client-id")
-	BatchCheckCmd.MarkFlagRequired("client-secret")
+	readerConfig := &config.FilterReaderConfig{}
+
+	batchCheckCmd := &cobra.Command{
+		Use:   "batch-check",
+		Short: "Check addresses in batch against a Bloom filter",
+		Run: func(cmd *cobra.Command, args []string) {
+			runBatchCheck(cmd, readerConfig)
+		},
+	}
+
+	config.BindBloomReaderFlags(batchCheckCmd, readerConfig)
+
+	RootCmd.AddCommand(batchCheckCmd)
 }
 
-func runBatchCheck(_ *cobra.Command, _ []string) {
+func runBatchCheck(cmd *cobra.Command, readerCfg *config.FilterReaderConfig) {
 	start := time.Now()
 	// if err := checkAuth(clientID, clientSecret, env); err != nil {
 	// 	fmt.Printf("Authentication failed: %v\n", err)
 	// 	os.Exit(-1)
 	// }
-	filter, err := loadBloomFilter(filename)
+	filter, err := helper.LoadBloomFilter(readerCfg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)

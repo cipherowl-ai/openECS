@@ -3,24 +3,13 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 	"os"
 
+	"github.com/cipherowl-ai/addressdb/internal/config"
 	"github.com/cipherowl-ai/addressdb/store"
+
 	"github.com/spf13/cobra"
-)
-
-var InspectCmd = &cobra.Command{
-	Use:   "inspect",
-	Short: "Inspect the Bloom filter statistics and file size",
-	Run:   runInspect,
-}
-
-var (
-	inspectFilename             string
-	inspectPrivateKeyFile       string
-	inspectPublicKeyFile        string
-	inspectPrivateKeyPassphrase string
-	jsonOutput                  bool
 )
 
 // InspectResult represents the inspection result for JSON output
@@ -36,23 +25,35 @@ type FileInfo struct {
 }
 
 func init() {
-	InspectCmd.Flags().StringVarP(&inspectFilename, "file", "f", "bloomfilter.gob", "Path to the .gob file containing the Bloom filter")
-	InspectCmd.Flags().StringVar(&inspectPrivateKeyFile, "private-key-file", "", "path to the recipient private key file (optional)")
-	InspectCmd.Flags().StringVar(&inspectPublicKeyFile, "public-key-file", "", "path to the sender public key file (optional)")
-	InspectCmd.Flags().StringVar(&inspectPrivateKeyPassphrase, "private-key-passphrase", "", "passphrase for the recipient private key (optional)")
-	InspectCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output in JSON format")
+	readerConfig := &config.FilterReaderConfig{}
+
+	inspectCmd := &cobra.Command{
+		Use:   "inspect",
+		Short: "Inspect the Bloom filter statistics and file size",
+		Run: func(cmd *cobra.Command, args []string) {
+			runInspect(cmd, readerConfig)
+		},
+	}
+
+	config.BindBloomReaderFlags(inspectCmd, readerConfig)
+	inspectCmd.Flags().BoolP("json", "j", false, "Output in JSON format")
+
+	RootCmd.AddCommand(inspectCmd)
+
 }
 
-func runInspect(_ *cobra.Command, _ []string) {
+func runInspect(cmd *cobra.Command, readerCfg *config.FilterReaderConfig) {
+	jsonOutput, _ := cmd.Flags().GetBool("json")
+
 	// Load the bloom filter
-	filter, err := loadBloomFilter(inspectFilename)
+	filter, err := helper.LoadBloomFilter(readerCfg)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(-1)
 	}
 
 	// Get the file size
-	fileInfo, err := os.Stat(inspectFilename)
+	fileInfo, err := os.Stat(readerCfg.Filename)
 	if err != nil {
 		fmt.Printf("Error getting file size: %v\n", err)
 		os.Exit(-1)

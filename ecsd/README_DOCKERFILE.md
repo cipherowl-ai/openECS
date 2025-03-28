@@ -21,21 +21,26 @@ docker run --env-file docker.env -p 8080:8080 -p 9090:9090 -v $(pwd)/ecsd/keypai
 
 The following environment variables can be configured:
 
-- Required:
-  - `CO_CLIENT_SECRET`: Your CipherOwl client secret
-  - `KEY_PASSPHRASE`: Your key passphrase
+#### Bloom Filter Configuration
+- `CO_FILENAME`: Bloom filter file path (default: "bloomfilter.gob")
+- `CO_DECRYPT_KEY`: Path to decrypt key file (default: "")
+- `CO_SIGNING_KEY`: Path to signing key file (default: "")
+- `CO_DECRYPT_KEY_PASSPHRASE`: Decrypt key passphrase (default: "")
 
-- Optional (with defaults):
-  - `PORT`: Port to listen on (default: 8080)
-  - `BURST`: Burst rate (default: 5)
-  - `RATELIMIT`: Rate limit (default: 20)
-  - `BLOOMFILTER_PATH`: Path to bloomfilter file (default: "/app/data/bloomfilter.gob")
-  - `PRIVATE_KEY_FILE`: Path to private key file (default: "/app/keys/privkey.asc")
-  - `PUBLIC_KEY_FILE`: Path to public key file (default: "/app/keys/pubkey.asc")
+#### Server Configuration
+- `CO_HTTP_PORT`: HTTP port (default: 8080)
+- `CO_GRPC_PORT`: gRPC port (default: 9090)
+- `CO_RATE_LIMIT`: Rate limit (default: 20)
+- `CO_BURST`: Burst limit (default: 5)
+
+#### Service Configuration (All Required)
+- `CO_CHAIN`: Chain name
+- `CO_DATASET`: Dataset name
+- `CO_BASE_URL`: Base URL for the API
+- `CO_CLIENT_ID`: Client ID
+- `CO_CLIENT_SECRET`: Client secret
 
 ### Persistent Storage
-
-To persist the Bloom filter data between container restarts:
 
 ```bash
 # Create a named volume
@@ -43,10 +48,7 @@ docker volume create ecsd-data
 
 # Run with volume mounted
 docker run \
-  -e CO_CLIENT_SECRET=your_secret \
-  -e KEY_PASSPHRASE=your_passphrase \
-  -p 8080:8080 \
-  -p 9090:9090 \
+  --env-file docker.env \
   -v $(pwd)/ecsd/keypair/:/app/keys \
   -v $(pwd)/ecsd-data:/app/data \
   --rm \

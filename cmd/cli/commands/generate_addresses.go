@@ -9,11 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	count       int
-	addressFile string
-)
-
 var AddressGenCmd = &cobra.Command{
 	Use:   "generate-addresses",
 	Short: "Generate Ethereum addresses",
@@ -21,11 +16,21 @@ var AddressGenCmd = &cobra.Command{
 }
 
 func init() {
-	AddressGenCmd.Flags().IntVarP(&count, "n", "n", 1000000, "number of addresses to generate")
-	AddressGenCmd.Flags().StringVarP(&addressFile, "output", "o", "addresses.txt", "output file for the addresses")
+	addressGenCmd := &cobra.Command{
+		Use:   "generate-addresses",
+		Short: "Generate Ethereum addresses",
+		Run:   runAddressGenerator,
+	}
+	addressGenCmd.Flags().IntP("n", "n", 1000000, "number of addresses to generate")
+	addressGenCmd.Flags().StringP("output", "o", "addresses.txt", "output file for the addresses")
+
+	RootCmd.AddCommand(addressGenCmd)
 }
 
-func runAddressGenerator(_ *cobra.Command, _ []string) {
+func runAddressGenerator(cmd *cobra.Command, _ []string) {
+	count, _ := cmd.Flags().GetInt("n")
+	addressFile, _ := cmd.Flags().GetString("output")
+
 	// Open the output file
 	file, err := os.Create(addressFile)
 	if err != nil {
