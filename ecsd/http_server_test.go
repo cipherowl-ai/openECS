@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/ecsd/config"
+	"github.com/cipherowl-ai/addressdb/internal/config"
 	"github.com/cipherowl-ai/addressdb/store"
 )
 

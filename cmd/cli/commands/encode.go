@@ -3,8 +3,9 @@ package commands
 import (
 	"bufio"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 	"os"
+
+	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
 
 	"github.com/cipherowl-ai/addressdb/address"
 	"github.com/cipherowl-ai/addressdb/internal/config"
@@ -28,6 +29,7 @@ func init() {
 	encodeCmd.Flags().UintP("number", "n", 10000000, "number of elements expected")
 	encodeCmd.Flags().Float64P("probability", "p", 0.00001, "false positive probability")
 	encodeCmd.Flags().StringP("input", "i", "addresses.txt", "input file path")
+	encodeCmd.Flags().BoolP("hash", "H", false, "hashes the addressees, this also accepts the hash as a string")
 
 	RootCmd.AddCommand(encodeCmd)
 }
@@ -36,8 +38,9 @@ func runEncode(cmd *cobra.Command, writerCfg *config.FilterWriterConfig) {
 	nFlag, _ := cmd.Flags().GetUint("number")
 	pFlag, _ := cmd.Flags().GetFloat64("probability")
 	inputFile, _ := cmd.Flags().GetString("input")
+	hashFlag, _ := cmd.Flags().GetBool("hash")
 
-	addressHandler := &address.EVMAddressHandler{}
+	addressHandler := &address.EVMAddressHandler{ConvertToHash: hashFlag}
 
 	options, err := helper.ConfigurePGPHandler(writerCfg.SigningKey, writerCfg.SigningKeyPassphrase, writerCfg.EncryptKey)
 	if err != nil {

@@ -58,7 +58,7 @@ func LoadBloomFilter(cfg *config.FilterReaderConfig) (*store.BloomFilterStore, e
 		return nil, err
 	}
 
-	addressHandler := &address.EVMAddressHandler{}
+	addressHandler := &address.EVMAddressHandler{ConvertToHash: cfg.IsHash}
 	filter, err := store.NewBloomFilterStoreFromFile(cfg.Filename, addressHandler, options...)
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %w", err)

@@ -10,6 +10,7 @@ import (
 
 type FilterReaderConfig struct {
 	Filename             string
+	IsHash               bool
 	DecryptKey           string
 	SigningKey           string
 	DecryptKeyPassphrase string
@@ -17,6 +18,7 @@ type FilterReaderConfig struct {
 
 func BindBloomReaderFlags(cmd *cobra.Command, cfg *FilterReaderConfig) {
 	cmd.Flags().StringVarP(&cfg.Filename, "filename", "f", getEnv("filename", "bloomfilter.gob"), "Path to the .gob file containing the Bloom filter")
+	cmd.Flags().BoolVar(&cfg.IsHash, "hash", getEnvBool("hash", false), "If true, the bloom filter stores address hashes instead of addresses strings")
 	cmd.Flags().StringVar(&cfg.DecryptKey, "decrypt-key", getEnv("decrypt-key", ""), "Path to the decrypt key file")
 	cmd.Flags().StringVar(&cfg.DecryptKeyPassphrase, "decrypt-key-passphrase", getEnv("decrypt-key-passphrase", ""), "Passphrase for the decrypt key")
 	cmd.Flags().StringVar(&cfg.SigningKey, "signing-key", getEnv("signing-key", ""), "Path to the signing key file")
@@ -93,4 +95,16 @@ func getEnvInt(key string, defaultValue int) int {
 		return defaultValue
 	}
 	return intValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	value := getEnv(key, "")
+	if value == "" {
+		return defaultValue
+	}
+	boolValue, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+	return boolValue
 }
