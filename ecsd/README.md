@@ -168,7 +168,7 @@ curl "http://localhost:8080/health"
 with a special header `__llm_bot_caller__: on`, the service will return explanations for LLM bots which returns a data dictionary of the json response to help the bot works better
 
 ```bash
-curl "http://localhost:8080/check?address=0xE5a00E3FccEfcCd9e4bA75955e12b6710eB254bE" -H "__llm_bot_caller__: on" | jq
+curl "http://localhost:8080/check?address=0xeb0baa3a556586192590cad296b1e48df62a8549" -H "__llm_bot_caller__: on" | jq
 ```
 
 ```json

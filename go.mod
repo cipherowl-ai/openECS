@@ -8,6 +8,7 @@ require (
 	github.com/ProtonMail/gopenpgp/v3 v3.0.0-beta.2-proton
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/btcsuite/btcd/btcutil v1.1.6
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/ethereum/go-ethereum v1.14.5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/golang-jwt/jwt/v5 v5.2.1

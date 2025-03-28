@@ -80,7 +80,7 @@ func loadBloomFilter(cfg *config.FilterReaderConfig) (*store.BloomFilterStore, e
 	}
 
 	// Create address handler
-	addressHandler := &address.EVMAddressHandler{}
+	addressHandler := &address.EVMAddressHandler{ConvertToHash: cfg.IsHash}
 
 	// First create an empty filter
 	filter, err := store.NewBloomFilterStore(addressHandler, options...)

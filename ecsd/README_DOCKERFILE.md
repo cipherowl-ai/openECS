@@ -13,7 +13,7 @@ docker build -t ecsd -f ecsd/Dockerfile .
 
 ### Basic Run Command
 ```bash
-docker run --env-file docker.env -p 8080:8080 -p 9090:9090 -v $(pwd)/ecsd/keypair/:/app/keys  ecsd:latest
+docker run --env-file docker.env -p 8080:8080 -p 9090:9090 -v ~/keys/:/app/keys  ecsd:latest
 ```
 
 
@@ -26,6 +26,7 @@ The following environment variables can be configured:
 - `CO_DECRYPT_KEY`: Path to decrypt key file (default: "")
 - `CO_SIGNING_KEY`: Path to signing key file (default: "")
 - `CO_DECRYPT_KEY_PASSPHRASE`: Decrypt key passphrase (default: "")
+- `CO_HASH`: If true, the bloom filter stores address hashes instead of addresses strings (default: false)
 
 #### Server Configuration
 - `CO_HTTP_PORT`: HTTP port (default: 8080)
