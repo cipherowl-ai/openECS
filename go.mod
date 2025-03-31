@@ -11,7 +11,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/ethereum/go-ethereum v1.14.5
 	github.com/fsnotify/fsnotify v1.8.0
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.8.1
