@@ -59,6 +59,6 @@ build-linux-release: prepare
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(RELEASE_FLAGS) -o $(TARGET_DIR)/release/$(BINARY_UNIX)-ecsd ./cmd/ecsd
 
 build-docker:
-	docker build -t ecsd -f ecsd/Dockerfile .
+	docker build -t open-ecsd -f ecsd/Dockerfile .
 
 .PHONY: all proto build-debug build-release clean build-linux-debug build-linux-release prepare

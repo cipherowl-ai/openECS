@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/internal/config"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/address"
+	"github.com/cipherowl-ai/openECS/internal/config"
+	"github.com/cipherowl-ai/openECS/store"
 )
 
 // MockReloadInfo is a minimal implementation of ReloadInfo for testing

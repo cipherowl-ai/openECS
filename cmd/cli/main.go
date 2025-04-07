@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cipherowl-ai/addressdb/cmd/cli/commands"
+	"github.com/cipherowl-ai/openECS/cmd/cli/commands"
 )
 
 func main() {

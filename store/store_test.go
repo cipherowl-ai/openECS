@@ -1,8 +1,8 @@
 package store
 
 import (
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/securedata"
+	"github.com/cipherowl-ai/openECS/address"
+	"github.com/cipherowl-ai/openECS/securedata"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/stretchr/testify/require"
 	"os"

@@ -1,4 +1,4 @@
-module github.com/cipherowl-ai/addressdb
+module github.com/cipherowl-ai/openECS
 
 go 1.22.0
 

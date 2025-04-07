@@ -8,9 +8,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/cipherowl-ai/addressdb/proto"
-	"github.com/cipherowl-ai/addressdb/reload"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/proto"
+	"github.com/cipherowl-ai/openECS/reload"
+	"github.com/cipherowl-ai/openECS/store"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

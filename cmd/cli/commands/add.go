@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/internal/config"
-	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
+	"github.com/cipherowl-ai/openECS/address"
+	"github.com/cipherowl-ai/openECS/internal/config"
+	"github.com/cipherowl-ai/openECS/internal/helpers/helper"
 
 	"github.com/spf13/cobra"
 )

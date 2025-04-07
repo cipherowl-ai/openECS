@@ -7,19 +7,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
+	"github.com/cipherowl-ai/openECS/internal/helpers/helper"
 	"log/slog"
 	"os"
 	"time"
 
 	"github.com/joho/godotenv"
 
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/ecsd"
-	"github.com/cipherowl-ai/addressdb/reload"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/address"
+	"github.com/cipherowl-ai/openECS/ecsd"
+	"github.com/cipherowl-ai/openECS/reload"
+	"github.com/cipherowl-ai/openECS/store"
 
-	"github.com/cipherowl-ai/addressdb/internal/config"
+	"github.com/cipherowl-ai/openECS/internal/config"
 	"github.com/spf13/cobra"
 )
 

@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cipherowl-ai/addressdb/address"
-	"github.com/cipherowl-ai/addressdb/internal/config"
-	"github.com/cipherowl-ai/addressdb/securedata"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/address"
+	"github.com/cipherowl-ai/openECS/internal/config"
+	"github.com/cipherowl-ai/openECS/securedata"
+	"github.com/cipherowl-ai/openECS/store"
 )
 
 const (

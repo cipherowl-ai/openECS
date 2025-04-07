@@ -3,11 +3,11 @@ package commands
 import (
 	"bufio"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
+	"github.com/cipherowl-ai/openECS/internal/helpers/helper"
 	"io"
 	"os"
 
-	"github.com/cipherowl-ai/addressdb/internal/config"
+	"github.com/cipherowl-ai/openECS/internal/config"
 
 	"github.com/spf13/cobra"
 )

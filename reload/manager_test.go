@@ -2,12 +2,12 @@ package reload
 
 import (
 	"context"
-	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/openECS/address"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
