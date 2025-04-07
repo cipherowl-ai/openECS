@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cipherowl-ai/addressdb/internal/config"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/internal/config"
+	"github.com/cipherowl-ai/openECS/store"
 	"github.com/gorilla/mux"
 	"golang.org/x/time/rate"
 )

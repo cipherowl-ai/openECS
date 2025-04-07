@@ -2,7 +2,7 @@ package store
 
 import (
 	"github.com/bits-and-blooms/bloom/v3"
-	"github.com/cipherowl-ai/addressdb/address"
+	"github.com/cipherowl-ai/openECS/address"
 	"github.com/ethereum/go-ethereum/crypto"
 	"log"
 	"math/rand"

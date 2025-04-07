@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/store"
 	"golang.org/x/sync/errgroup"
 )
 

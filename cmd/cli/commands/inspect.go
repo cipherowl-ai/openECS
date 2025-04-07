@@ -3,11 +3,11 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/cipherowl-ai/addressdb/internal/helpers/helper"
+	"github.com/cipherowl-ai/openECS/internal/helpers/helper"
 	"os"
 
-	"github.com/cipherowl-ai/addressdb/internal/config"
-	"github.com/cipherowl-ai/addressdb/store"
+	"github.com/cipherowl-ai/openECS/internal/config"
+	"github.com/cipherowl-ai/openECS/store"
 
 	"github.com/spf13/cobra"
 )
