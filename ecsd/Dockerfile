@@ -1,5 +1,5 @@
 # Builder image
-FROM golang:1.22-alpine3.21 AS builder
+FROM golang:1.26-alpine3.23 AS builder
 
 # Install required runtime dependencies
 # RUN apk add --no-cache \
@@ -15,7 +15,9 @@ COPY . .
 RUN go build -o ecsd-bin cmd/ecsd/main.go
 
 # Runtime image
-FROM alpine:3.21
+FROM alpine:3.23
+
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 
